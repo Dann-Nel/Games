@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Scurry">
+<meta name="theme-color" content="#14213d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
+<title>Scurry Live</title>
+<style>
+:root{--bg:#14213d;--card:#1f3157;--ink:#fff;--mut:#9fb0d0;--acc:#fca311;--bad:#e5383b;--ok:#2ec4b6}
+*{box-sizing:border-box}html,body{height:100%;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button,.lbl{-webkit-user-select:none;user-select:none;touch-action:manipulation}
+#game{height:100vh;height:100dvh}
+#bg{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 140px);z-index:650;background:var(--bad);color:#fff;font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
+.rep{margin-left:6px;opacity:.6;font-size:12px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,system-ui,sans-serif;transition:background .2s}
+body.flash{background:var(--bad)}
+.pg{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 16px 40px}
+h1{margin:6px 0}.s{color:var(--mut);margin:0 0 14px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;margin:8px 0 3px;color:var(--mut);font-size:13px}
+input{width:100%;padding:11px;border-radius:9px;border:0;font-size:16px;background:#0e1830;color:var(--ink)}
+button{width:100%;padding:13px;border:0;border-radius:11px;font-size:16px;font-weight:700;background:var(--acc);color:#14213d;margin-top:8px}
+button.g{background:#2a4073;color:var(--ink)}button.d{background:var(--bad);color:#fff}button.on{outline:3px solid var(--ok)}
+.seg{display:flex;gap:6px}.seg button{margin:0;padding:11px 4px;font-size:15px}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a4073;font-size:15px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#game{position:fixed;inset:0;display:none}
+#map{position:absolute;inset:0}
+#hud{position:absolute;left:0;right:0;top:0;z-index:500;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:linear-gradient(#14213dee,#14213d00);pointer-events:none}
+#hud .a{display:flex;justify-content:space-between;font-weight:800;font-size:15px}
+#hud .b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+#hud .c{font-size:13px;color:#ffe9b8}
+#bar{position:absolute;left:0;right:0;bottom:0;z-index:500;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-wrap:wrap;gap:8px;background:#14213dd9}
+#bar button{margin:0;padding:12px 4px;font-size:15px;flex:1 1 30%}
+#bar #bcaught{flex:1 1 100%;order:-1;padding:16px 4px;font-size:18px}
+#hostp{position:absolute;left:0;right:0;bottom:0;z-index:700;height:70%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
+#hl{flex:1;overflow:auto}
+#toast{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:600;background:var(--acc);color:#14213d;font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
+#chat{position:absolute;left:0;right:0;bottom:0;z-index:700;height:55%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
+#msgs{flex:1;overflow:auto;font-size:15px}#msgs b{color:var(--acc)}
+#cin{display:flex;gap:6px}#cin button{width:90px;margin:0}
+.mk{border-radius:50%;border:2px solid #fff;width:14px;height:14px}
+.lbl{background:#000a;color:#fff;border:0;border-radius:4px;font-size:11px;padding:1px 4px}
+</style></head><body>
+<div id="home" class="pg"></div>
+
+<div id="game">
+  <div id="map"></div>
+  <div id="hud"><div class="a"><span id="hrole"></span><span id="hcount"></span></div><div class="b" id="hclock"></div><div class="c" id="hsub"></div></div>
+  <div id="toast"></div><div id="bg">Scurry was in the background, so your location stopped updating. Keep the app open with the screen on.</div>
+  <div id="chat"><div id="msgs"></div><div id="cin"><input id="ctext" maxlength="200" placeholder="Team message"><button id="csend">Send</button></div><button class="g" id="cclose">Close</button></div>
+  <div id="hostp"><b>Host controls</b><p class="s" style="margin:4px 0 8px">Roles are hidden from you so hosting stays fair.</p><div id="hl"></div><button class="d" id="hend">End game now</button><button class="g" id="hclose">Close</button></div>
+  <div id="bar"><button class="g" id="bchat">Chat</button><button class="g" id="bvoice">Voice</button><button id="buse" style="display:none">Use</button><button class="d" id="bcaught">I've been tagged: I'm out</button><button class="d" id="bsos">SOS</button><button class="g" id="bhost" style="display:none">Host</button><button id="bact">Me</button></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sosList=[];
+let ws,S=null,token=null,code=null,me=null,map,L_=window.L,layers={},myPos=null,wake=null,audioCtx,lkRoom,micOn=false,cfgDraft={};
+const cid=(()=>{try{let c=localStorage.getItem('sc_cid');if(!c){c=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('sc_cid',c)}return c}catch(e){return null}})();
+const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+
+// ---------- connection ----------
+function connect(then){
+  ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
+  ws.onopen=()=>{ const t=store.get('sc_token'),c=store.get('sc_code'); if(t&&c&&!then)send({t:'resume',code:c,token:t}); else if(then)then(); else render(); };
+  ws.onmessage=e=>onMsg(JSON.parse(e.data));
+  ws.onclose=()=>{ setTimeout(()=>connect(),1500) };
+}
+const send=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
+function onMsg(m){
+  if(m.t==='joined'){token=m.token;code=m.code;me=m.id;store.set('sc_token',token);store.set('sc_code',code);}
+  else if(m.t==='gone'){store.set('sc_token','');S=null;render();}
+  else if(m.t==='state'){S=m;render();}
+  else if(m.t==='event'){toast(m.text);if(['ping','hunt','warn','out','over','item'].includes(m.kind))alertUser(m.kind);}
+  else if(m.t==='chat')addChat(m);
+  else if(m.t==='error')toast(m.text);
+  else if(m.t==='fix')freshFix();
+  else if(m.t==='voice')startVoice(m);
+  else if(m.t==='sos'){sosList.push(m);alertUser('warn');toast('SOS from '+m.name+(m.lat!=null?' (red marker on the map)':'')+'. Check on them!');}
+  else if(m.t==='kicked'){store.set('sc_token','');store.set('sc_code','');alert('You were removed from the game by the host.');location.reload();}
+}
+function toast(t,quiet){const el=$('#toast');el.textContent=t;el.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.display='none',4500);
+  if(!quiet&&(!S||S.phase==='lobby'))alert(t);}
+function beep(f){try{audioCtx=audioCtx||new AudioContext();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=f;o.connect(g);g.connect(audioCtx.destination);g.gain.value=.3;o.start();o.stop(audioCtx.currentTime+.3)}catch(e){}}
+function alertUser(k){beep({ping:740,hunt:1000,warn:300,out:400,over:520}[k]||800);navigator.vibrate&&navigator.vibrate([200,100,200]);document.body.classList.add('flash');setTimeout(()=>document.body.classList.remove('flash'),400);}
+
+// ---------- geolocation ----------
+function watchGPS(){
+  if(watchGPS.id||!navigator.geolocation)return;
+  watchGPS.id=navigator.geolocation.watchPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc});},
+    e=>{if(Date.now()-(watchGPS.lastErr||0)>30000){watchGPS.lastErr=Date.now();toast('GPS: '+e.message+'. Location must be allowed.',true)}},{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+}
+// The server asks for this a few seconds before every ping so the revealed dot is as fresh and precise as possible.
+function freshFix(){if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc})},()=>{},{enableHighAccuracy:true,maximumAge:0,timeout:4000})}
+function stopGPS(){if(watchGPS.id){navigator.geolocation.clearWatch(watchGPS.id);watchGPS.id=null}myPos=null}
+async function keepAwake(){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
+let hiddenAt=0;
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){hiddenAt=Date.now();return}
+  if(S&&S.phase!=='lobby'){keepAwake();freshFix();
+    if(S.phase!=='over'&&hiddenAt&&Date.now()-hiddenAt>8000){const b=$('#bg');b.style.display='block';setTimeout(()=>b.style.display='none',6000)}}
+  hiddenAt=0;
+});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+// ---------- screens ----------
+function render(){
+  if(S&&S.phase==='lobby')sosList.length=0;               // old SOS markers must not carry into a rematch
+  if(S&&S.phase==='over')stopGPS();                       // privacy: stop sharing location once the game ends
+  else if(S&&(S.phase==='hide'||S.phase==='hunt'))watchGPS(); // also covers a reload mid-game
+  if(!S){$('#game').style.display='none';$('#home').style.display='block';return home();}
+  if(S.phase==='lobby'){$('#game').style.display='none';$('#home').style.display='block';return lobby();}
+  $('#home').style.display='none';$('#game').style.display='block';game();
+}
+function home(){
+  if($('#home').dataset.mode==='home')return; $('#home').dataset.mode='home';
+  $('#home').innerHTML=`<h1>Scurry Live</h1><p class="s">Real-life hide-and-seek for up to 70 players. Runners hide, hunters seek, the zone shrinks.</p>
+  <div class="card">${store.get('sc_consent')?'':'<label style="color:#fff;font-size:14px"><input type="checkbox" id="cons" style="width:auto"> I agree to share my live location with the other players in my game. It is used only during the game and deleted when it ends.</label>'}<label>Your name</label><input id="nm" maxlength="20" value="${esc(store.get('sc_name')||'')}">
+  <button id="mk">Host a new game</button><label>Or join with a code</label><input id="cd" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"><button class="g" id="jn">Join game</button></div>
+  <p class="s">Needs location access. On iPhone: Share, then Add to Home Screen. Keep Scurry open and the screen on while playing.</p>`;
+  const nm=()=>{const n=$('#nm').value.trim();if(!n){toast('Enter a name');return null}
+    if(!store.get('sc_consent')){if(!$('#cons').checked){toast('Please agree to share your location to play.');return null}store.set('sc_consent','1')}
+    store.set('sc_name',n);return n};
+  const qc=new URLSearchParams(location.search).get('code');if(qc)$('#cd').value=qc.toUpperCase().slice(0,4);
+  $('#mk').onclick=()=>{const n=nm();if(!n)return;watchGPS();send({t:'create',name:n,consent:true,cid});};
+  $('#jn').onclick=()=>{const n=nm();if(!n)return;watchGPS();send({t:'join',code:$('#cd').value.trim(),name:n,consent:true,cid});};
+}
+let lobbyMap;
+function lobby(){
+  watchGPS();
+  const sig=JSON.stringify([S.players,S.cfg,S.you.pref,S.host,S.center,S.spots]);
+  if($('#home').dataset.mode==='lobby'&&(sig===lobby.sig||$('#home').contains(document.activeElement)&&document.activeElement.tagName==='INPUT'))return;
+  lobby.sig=sig;$('#home').dataset.mode='lobby';
+  if(lobbyMap){lobbyMap.remove();lobbyMap=null}
+  const c=S.cfg,counts={runner:0,hunter:0,random:0};S.players.forEach(p=>counts[p.pref]++);
+  const field=(k,l,v)=>`<div><label>${l}</label><input data-k="${k}" type="number" step="any" value="${v}" ${S.host?'':'disabled'}></div>`;
+  $('#home').innerHTML=`<h1>Game ${S.code}</h1><p class="s">${S.players.length}/70 players. Share the code.</p>
+  <div class="card"><label>I want to be</label><div class="seg">${['runner','hunter','random'].map(r=>`<button class="g ${S.you.pref===r?'on':''}" data-pref="${r}">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
+  <p class="s" style="margin:8px 0 0">Choices: ${counts.runner} runner, ${counts.hunter} hunter, ${counts.random} random. Hunters are picked from hunter and random players.</p></div>
+  <div class="card"><b>Players</b>${S.players.map(p=>`<div class="row"><span>${esc(p.name)}${p.id===S.you.id?' (you)':''}${p.online?'':' ·offline'}</span><span>${p.pref}${S.host&&p.id!==S.you.id?` <button class="d" data-kick="${p.id}" style="width:auto;padding:4px 10px;margin:0">Kick</button>`:''}</span></div>`).join('')}</div>
+  ${S.host?`<div class="card"><b>Rules (host)</b><div class="grid">
+   ${field('hunterRatio','Hunter share (0.15 = 15%)',c.hunterRatio)}${field('hideSecs','Hide time (s)',c.hideSecs)}
+   ${field('radius','Zone radius (m)',c.radius)}${field('stages','Shrinks',c.stages)}
+   ${field('hold','Hold before shrink (s)',c.hold)}${field('shrink','Shrink duration (s)',c.shrink)}
+   ${field('pingEvery','Ping every (s)',c.pingEvery)}${field('huntSecs','Max game (s)',c.huntSecs)}
+   ${field('outsideGrace','Outside-zone limit (s)',c.outsideGrace)}${field('tagRange','Tag range (m)',c.tagRange)}
+   ${field('safeSecs','Safe-spot time per runner (s)',c.safeSecs)}${field('safeRadius','Safe-spot radius (m)',c.safeRadius)}
+   ${field('bountyAt','Bounty when runners left ≤',c.bountyAt)}${field('bountyEvery','Bounty ping every (s)',c.bountyEvery)}
+   ${field('dropEvery','Supply drop every (s)',c.dropEvery)}${field('radarRadius','Radar radius (m)',c.radarRadius)}
+   ${field('gpsStaleWarn','No-GPS warning after (s)',c.gpsStaleWarn)}${field('gpsStaleOut','No-GPS runner out after (s, 0 = never)',c.gpsStaleOut)}
+   ${field('maxAccuracy','Ignore GPS worse than (m)',c.maxAccuracy)}${field('maxSpeed','Max speed (m/s, 0 = off)',c.maxSpeed)}
+   ${field('sosRadius','SOS reaches players within (m)',c.sosRadius)}</div>
+   <label><input type="checkbox" data-b="bounty" ${c.bounty?'checked':''} style="width:auto"> Bounty ping when few runners remain</label>
+   <label><input type="checkbox" data-b="drops" ${c.drops?'checked':''} style="width:auto"> Supply drops with power-ups</label>
+   <label><input type="checkbox" data-b="teamChat" ${c.teamChat?'checked':''} style="width:auto"> Team chat</label>
+   <label><input type="checkbox" data-b="voice" ${c.voice?'checked':''} style="width:auto"> Team voice</label>
+   <label><input type="checkbox" data-b="caughtJoinHunters" ${c.caughtJoinHunters?'checked':''} style="width:auto"> Caught runners become hunters</label>
+   <label><input type="checkbox" data-b="pingRevealsHunters" ${c.pingRevealsHunters?'checked':''} style="width:auto"> Pings also reveal hunters to runners</label>
+   <p class="s" style="margin:8px 0 4px">Tap the map to set the zone centre (red) or add safe spots (green, ${S.spots.length}/10). Without a centre it uses your GPS.</p>
+   <div class="seg"><button class="g on" id="m1">Set zone centre</button><button class="g" id="m2">Add safe spot</button><button class="g" id="m3">Clear spots</button></div>
+   <div id="lmap" style="height:220px;border-radius:10px;margin-top:8px"></div>
+   <button id="go">Start game</button></div>`:'<p class="s">Waiting for the host to start...</p>'}
+  <button class="g" id="shr">Share join link</button><button class="g" id="lv">Leave</button>`;
+  $('#shr').onclick=async()=>{const u=location.origin+'/?code='+S.code;
+    try{if(navigator.share)await navigator.share({title:'Join my Scurry game',text:'Match code '+S.code,url:u});else{await navigator.clipboard.writeText(u);toast('Link copied')}}catch(e){}};
+  document.querySelectorAll('[data-pref]').forEach(b=>b.onclick=()=>send({t:'pref',pref:b.dataset.pref}));
+  document.querySelectorAll('#home [data-kick]').forEach(b=>b.onclick=()=>{if(confirm('Remove this player?'))send({t:'kick',id:b.dataset.kick})});
+  $('#lv').onclick=()=>{store.set('sc_token','');store.set('sc_code','');location.reload()};
+  if(S.host){
+    const push=()=>{const cfg={};document.querySelectorAll('[data-k]').forEach(i=>cfg[i.dataset.k]=+i.value);document.querySelectorAll('[data-b]').forEach(i=>cfg[i.dataset.b]=i.checked);send({t:'config',cfg})};
+    document.querySelectorAll('[data-k],[data-b]').forEach(i=>i.onchange=push);
+    $('#go').onclick=()=>{push();setTimeout(()=>send({t:'start'}),200)};
+    const at=S.center||myPos;
+    lobbyMap=L_.map('lmap').setView(at?[at.lat,at.lng]:[0,0],at?15:2);
+    L_.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(lobbyMap);
+    let circ=null;const draw=ll=>{if(circ)lobbyMap.removeLayer(circ);circ=L_.circle(ll,{radius:c.radius,color:'#e5383b',fillOpacity:.1}).addTo(lobbyMap)};
+    if(at)draw([at.lat,at.lng]);
+    S.spots.forEach(s=>L_.circle([s.lat,s.lng],{radius:c.safeRadius,color:'#2ec4b6',fillOpacity:.3}).addTo(lobbyMap));
+    let mode='center';const setM=m=>{mode=m;$('#m1').className='g'+(m==='center'?' on':'');$('#m2').className='g'+(m==='spot'?' on':'')};
+    $('#m1').onclick=()=>setM('center');$('#m2').onclick=()=>setM('spot');$('#m3').onclick=()=>send({t:'spots_clear'});
+    lobbyMap.on('click',e=>{if(mode==='center'){send({t:'center',lat:e.latlng.lat,lng:e.latlng.lng});draw(e.latlng)}else send({t:'spot',lat:e.latlng.lat,lng:e.latlng.lng})});
+  }
+}
+
+// ---------- game ----------
+function initMap(){
+  if(map)return;
+  map=L_.map('map',{zoomControl:false}).setView([S.center.lat,S.center.lng],16);
+  L_.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  layers={cur:L_.circle([0,0],{radius:1,color:'#e5383b',weight:3,fillColor:'#e5383b',fillOpacity:.05}).addTo(map),
+    next:L_.circle([0,0],{radius:1,color:'#fff',weight:2,dashArray:'8 8',fill:false}).addTo(map),
+    meAcc:L_.circle([0,0],{radius:1,color:'#1d6bff',weight:1,fillOpacity:.12,interactive:false}).addTo(map),
+    me:L_.circleMarker([0,0],{radius:8,color:'#fff',fillColor:'#1d6bff',fillOpacity:1,weight:3}).addTo(map),
+    mk:L_.layerGroup().addTo(map),fx:L_.layerGroup().addTo(map)};
+  map.invalidateSize();
+  layers.cur.setLatLng([S.center.lat,S.center.lng]).setRadius(S.cfg.radius);
+  map.fitBounds(layers.cur.getBounds());
+  window.addEventListener('resize',()=>map.invalidateSize());
+}
+const fmt=ms=>{ms=Math.max(0,Math.ceil(ms/1000));return Math.floor(ms/60)+':'+String(ms%60).padStart(2,'0')};
+function game(){
+  initMap();keepAwake();
+  const z=S.zone,y=S.you,skew=S.now-Date.now(),now=Date.now()+skew;
+  layers.cur.setLatLng([z.cur.lat,z.cur.lng]).setRadius(z.cur.r);
+  if(z.next)layers.next.setLatLng([z.next.lat,z.next.lng]).setRadius(z.next.r).setStyle({opacity:1});else layers.next.setStyle({opacity:0});
+  if(myPos){layers.me.setLatLng([myPos.lat,myPos.lng]);layers.meAcc.setLatLng([myPos.lat,myPos.lng]).setRadius(Math.max(myPos.acc||1,1));}
+  layers.fx.clearLayers();
+  for(const s of S.spots)L_.circle([s.lat,s.lng],{radius:S.cfg.safeRadius,color:'#2ec4b6',weight:2,dashArray:'4 4',fillOpacity:.25}).bindTooltip('Safe spot',{className:'lbl'}).addTo(layers.fx);
+  for(const d of S.drops)L_.circleMarker([d.lat,d.lng],{radius:11,color:'#fff',weight:3,fillColor:'#b455ff',fillOpacity:1}).bindTooltip('Supply drop · '+fmt(d.expires-now),{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);
+  for(const s of sosList)if(s.lat!=null&&now-s.at<600000)L_.circleMarker([s.lat,s.lng],{radius:14,color:'#fff',weight:3,fillColor:'#ff0000',fillOpacity:.9}).bindTooltip('SOS: '+esc(s.name),{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);
+  layers.mk.clearLayers();
+  for(const m of S.markers){
+    const age=Math.round((now-m.t)/1000);
+    const col={ally:'#2ec4b6',ping:'#fca311',exposed:'#e5383b'}[m.kind];
+    if(m.acc>8)L_.circle([m.lat,m.lng],{radius:m.acc,color:col,weight:1,fillOpacity:.08,interactive:false}).addTo(layers.mk);  // accuracy ring
+    const c=L_.circleMarker([m.lat,m.lng],{radius:m.kind==='ally'?6:9,color:'#fff',weight:2,fillColor:col,fillOpacity:m.kind==='ping'?Math.max(.35,1-age/(S.cfg.pingEvery*2)):1}).addTo(layers.mk);
+    c.bindTooltip(m.kind==='ally'?esc(m.name):`${esc(m.name)} · ${m.kind==='ping'?'last ping '+age+'s ago':'EXPOSED live'}${m.acc?' ±'+m.acc+'m':''}`,{permanent:m.kind!=='ally',direction:'top',className:'lbl'});
+  }
+  const role=y.out?(y.role==='hunter'?'HUNTER (caught)':'SPECTATOR'):y.role.toUpperCase();
+  $('#hrole').textContent=role;$('#hcount').textContent=`${S.counts.runners} runners · ${S.counts.hunters} hunters`;
+  if(S.phase==='over'){
+    $('#hclock').textContent={hunters:'Hunters win',runners:'Runners win',none:'Game ended by host'}[S.winner]||'Game over';$('#hsub').textContent='';
+  }else if(S.phase==='hide'){
+    $('#hclock').textContent=fmt(S.huntStart-now);$('#hsub').textContent=y.role==='runner'?'Hide! Hunters are frozen.':'Hunters wait: runners are hiding.';
+  }else{
+    $('#hclock').textContent=z.next?fmt(z.until-now):fmt(S.huntEnd-now);
+    let s=z.next?(z.shrinking?'Zone is shrinking now':`Zone shrinks in ${fmt(z.until-now)}`):'Final zone';
+    s+=` · next ping ${fmt(S.nextPingAt-now)}`;
+    if(y.safe)s='SAFE SPOT: can\'t be tagged. Shelter left '+Math.round(y.safeLeft)+'s';
+    if(y.outsideSince)s='OUTSIDE ZONE: hunters see you! Out in '+fmt(y.outsideSince+S.cfg.outsideGrace*1000-now);
+    if(y.stale)s='NO GPS SIGNAL ('+y.stale+'s)! '+s;
+    $('#hsub').textContent=s;
+  }
+  $('#bvoice').style.display=S.cfg.voice?'':'none';$('#bchat').style.display=S.cfg.teamChat?'':'none';
+  $('#bhost').style.display=S.host?'':'none';hostPanel();
+  const bu=$('#buse');bu.style.display=(y.item&&S.phase==='hunt')?'':'none';
+  bu.textContent='Use '+({decoy:'Decoy',ghost:'Ghost',radar:'Radar'}[y.item]||'');
+  $('#bcaught').style.display=(y.role==='runner'&&!y.out&&S.phase!=='over')?'':'none';
+  const act=$('#bact');
+  if(S.phase==='over'){act.textContent=S.host?'Rematch':'Game over';act.className='';act.onclick=()=>S.host&&send({t:'rematch'});}
+  else if(y.role==='runner'&&!y.out){act.textContent='Backup code: '+y.tagCode;act.className='';act.onclick=null;}
+  else if(y.role==='hunter'){act.textContent='Enter runner\'s code';act.className='g';act.onclick=()=>{const c=prompt('Only if a runner you tagged won\'t report it: enter their 4-digit code');if(c)send({t:'tag',code:c})};}
+  else{act.textContent='Out';act.onclick=null;}
+}
+
+// ---------- chat + voice ----------
+const chatLog=[];
+function addChat(m){chatLog.push(m);const box=$('#msgs');box.insertAdjacentHTML('beforeend',`<div><b>${esc(m.from)}</b> ${esc(m.text)}${m.fid&&m.fid!==(S&&S.you.id)?` <a class="rep" data-rep="${esc(m.fid)}" data-nm="${esc(m.from)}">report</a>`:''}</div>`);box.scrollTop=box.scrollHeight;
+  if($('#chat').style.display!=='flex')$('#bchat').textContent='Chat •';}
+$('#buse').onclick=()=>send({t:'use'});
+$('#bsos').onclick=()=>{if(confirm('Send an SOS? The host and players near you will see your location. Only use this if you need help.'))send({t:'sos'})};
+$('#bhost').onclick=()=>hostPanel(true);
+$('#hclose').onclick=()=>{$('#hostp').style.display='none'};
+$('#hend').onclick=()=>{if(confirm('End the game for everyone?'))send({t:'end'})};
+function hostPanel(open){
+  const el=$('#hostp');if(open)el.style.display='flex';
+  if(el.style.display!=='flex'||!S||!S.roster)return;
+  const sig=JSON.stringify([S.roster,S.reports]);if(!open&&sig===hostPanel.sig)return;hostPanel.sig=sig;
+  $('#hl').innerHTML=S.roster.filter(r=>r.id!==S.you.id).map(r=>`<div class="row"><span>${esc(r.name)}${r.online?'':' (offline)'}${r.stale?' · no GPS '+r.stale+'s':''}${r.flags?' · flagged x'+r.flags:''}${r.reports?' · reported x'+r.reports:''}</span><span><button class="g" data-mute="${r.id}" data-on="${r.muted?0:1}">${r.muted?'Unmute':'Mute'}</button> <button class="d" data-kick="${r.id}">Kick</button></span></div>`).join('')||'<p class="s">No other players.</p>';
+  if(S.reports&&S.reports.length)$('#hl').insertAdjacentHTML('afterbegin','<div class="card"><b>Reports</b>'+S.reports.slice(-8).reverse().map(x=>`<div class="row"><span>${esc(x.aboutName)} · ${x.reason}</span><span class="s" style="margin:0">by ${esc(x.byName)}</span></div>`).join('')+'</div>');
+  document.querySelectorAll('#hl [data-mute]').forEach(b=>b.onclick=()=>send({t:'mute',id:b.dataset.mute,on:b.dataset.on==='1'}));
+  document.querySelectorAll('#hl [data-kick]').forEach(b=>b.onclick=()=>{if(confirm('Remove this player from the game?'))send({t:'kick',id:b.dataset.kick})});
+}
+$('#bcaught').onclick=()=>{if(confirm('Were you tagged? Tap OK to report it. You will be out of the game.'))send({t:'caught'})};
+$('#bchat').onclick=()=>{$('#chat').style.display='flex';$('#bchat').textContent='Chat';$('#msgs').scrollTop=1e9};
+$('#msgs').onclick=e=>{const a=e.target.closest('[data-rep]');if(!a)return;
+  const r=prompt('Report '+a.dataset.nm+'. Type 1 for abuse, 2 for cheating, 3 for unsafe behaviour, 4 for other:');
+  const reason={1:'abuse',2:'cheating',3:'unsafe',4:'other'}[(r||'').trim()];if(reason)send({t:'report',id:a.dataset.rep,reason})};
+$('#cclose').onclick=()=>$('#chat').style.display='none';
+const sendChat=()=>{const t=$('#ctext').value.trim();if(t){send({t:'chat',text:t});$('#ctext').value=''}};
+$('#csend').onclick=sendChat;$('#ctext').onkeydown=e=>{if(e.key==='Enter')sendChat()};
+$('#bvoice').onclick=async()=>{
+  if(lkRoom){micOn=!micOn;await lkRoom.localParticipant.setMicrophoneEnabled(micOn);$('#bvoice').textContent=micOn?'Mic ON':'Mic off';return}
+  send({t:'voice'});
+};
+async function startVoice(v){
+  try{
+    if(!window.LivekitClient)await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/livekit-client@2.5.0/dist/livekit-client.umd.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)});
+    const LK=window.LivekitClient;lkRoom=new LK.Room();
+    lkRoom.on(LK.RoomEvent.TrackSubscribed,t=>{if(t.kind==='audio'){const a=t.attach();a.style.display='none';document.body.appendChild(a)}});
+    await lkRoom.connect(v.url,v.token);await lkRoom.localParticipant.setMicrophoneEnabled(true);micOn=true;$('#bvoice').textContent='Mic ON';
+  }catch(e){lkRoom=null;toast('Voice failed: '+(e.message||e))}
+}
+setInterval(()=>{if(S&&S.phase!=='lobby'&&!$('#game').hidden)game()},1000);
+connect();
+</script></body></html>

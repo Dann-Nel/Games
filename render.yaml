@@ -1,0 +1,10 @@
+# One-click deploy: https://render.com -> New -> Blueprint -> pick this repo. Gives you an HTTPS URL for your phone.
+services:
+  - type: web
+    name: scurry-live
+    runtime: node
+    rootDir: scurry-live
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    healthCheckPath: /healthz
