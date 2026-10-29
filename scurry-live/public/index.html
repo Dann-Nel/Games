@@ -212,7 +212,19 @@ function watchGPS(){
 function freshFix(){if(BG||!navigator.geolocation)return;
   navigator.geolocation.getCurrentPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc})},()=>{},{enableHighAccuracy:true,maximumAge:3000,timeout:6000})}
 function stopGPS(){const id=watchGPS.id;watchGPS.id=null;if(id){if(BG){if(id!=='pending')BG.removeWatcher({id})}else navigator.geolocation.clearWatch(id)}myPos=null}
-async function keepAwake(){if(NATIVE)return;try{wake=await navigator.wakeLock.request('screen')}catch(e){}}   // the native app tracks with the screen off, so it need not hold the screen on
+// Keeps the screen on. Uses the Wake Lock API where it exists; iPhone browsers that lack it get a tiny looping silent video (the "NoSleep" trick),
+// which must be started from a tap, so primeAwake() is called from the Host / Join / Start buttons.
+const NOSLEEP='data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAANMbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAA+gAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAnZ0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAA+gAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAEAAAABAAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAPoAAAAAAABAAAAAAHubWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAoAAAAKABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABmW1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAVlzdGJsAAAAuXN0c2QAAAAAAAAAAQAAAKlhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAQABIAAAASAAAAAAAAAABFUxhdmM2MC4zMS4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAAL2F2Y0MBQsAK/+EAF2dCwArZBCbARAAAAwAEAAADAFA8SJkgAQAFaMuDyyAAAAAQcGFzcAAAAAEAAAABAAAAFGJ0cnQAAAAAAAAXSAAAF0gAAAAYc3R0cwAAAAAAAAABAAAACgAABAAAAAAUc3RzcwAAAAAAAAABAAAAAQAAABxzdHNjAAAAAAAAAAEAAAABAAAACgAAAAEAAAA8c3RzegAAAAAAAAAAAAAACgAAAo8AAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAUc3RjbwAAAAAAAAABAAADfAAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAAABMYXZmNjAuMTYuMTAwAAAACGZyZWUAAALxbWRhdAAAAnEGBf//bdxF6b3m2Ui3lizYINkj7u94MjY0IC0gY29yZSAxNjQgcjMxMDggMzFlMTlmOSAtIEguMjY0L01QRUctNCBBVkMgY29kZWMgLSBDb3B5bGVmdCAyMDAzLTIwMjMgLSBodHRwOi8vd3d3LnZpZGVvbGFuLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0wIHJlZj0zIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDE6MHgxMTEgbWU9aGV4IHN1Ym1lPTcgcHN5PTEgcHN5X3JkPTEuMDA6MC4wMCBtaXhlZF9yZWY9MSBtZV9yYW5nZT0xNiBjaHJvbWFfbWU9MSB0cmVsbGlzPTEgOHg4ZGN0PTAgY3FtPTAgZGVhZHpvbmU9MjEsMTEgZmFzdF9wc2tpcD0xIGNocm9tYV9xcF9vZmZzZXQ9LTIgdGhyZWFkcz0yIGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAga2V5aW50PTI1MCBrZXlpbnRfbWluPTEwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAFmWIhA/yYoAAw+ycnJ1111111111114AAAAGQZo4H+EYAAAABkGaVAf4RgAAAAZBmmA/wjAAAAAGQZqAP8IwAAAABkGaoD/CMAAAAAZBmsA/wjAAAAAGQZrgP8IwAAAABkGbADvCMAAAAAZBmyA3wjA=';
+let nsVideo=null;
+function primeAwake(){
+  if(NATIVE||('wakeLock' in navigator))return;
+  try{if(!nsVideo){nsVideo=document.createElement('video');nsVideo.setAttribute('playsinline','');nsVideo.setAttribute('muted','');nsVideo.muted=true;nsVideo.loop=true;
+      nsVideo.style.cssText='position:fixed;width:1px;height:1px;opacity:.01;pointer-events:none;left:0;top:0';nsVideo.src=NOSLEEP;document.body.appendChild(nsVideo)}
+    nsVideo.play().catch(()=>{})}catch(e){}
+}
+async function keepAwake(){if(NATIVE)return;
+  if('wakeLock' in navigator){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
+  else if(nsVideo&&nsVideo.paused)nsVideo.play().catch(()=>{})}   // the native app tracks with the screen off, so it need not hold the screen on
 let hiddenAt=0;
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){hiddenAt=Date.now();return}
@@ -245,8 +257,8 @@ function home(){
     if(!store.get('sc_consent')){if(!$('#cons').checked){toast('Please agree to share your location to play.');return null}store.set('sc_consent','1')}
     store.set('sc_name',n);return n};
   const qc=new URLSearchParams(location.search).get('code');if(qc)$('#cd').value=qc.toUpperCase().slice(0,4);
-  $('#mk').onclick=()=>{const n=nm();if(!n)return;watchGPS();send({t:'create',name:n,consent:true,cid});};
-  $('#jn').onclick=()=>{const n=nm();if(!n)return;watchGPS();send({t:'join',code:$('#cd').value.trim(),name:n,consent:true,cid});};
+  $('#mk').onclick=()=>{const n=nm();if(!n)return;primeAwake();watchGPS();send({t:'create',name:n,consent:true,cid});};
+  $('#jn').onclick=()=>{const n=nm();if(!n)return;primeAwake();watchGPS();send({t:'join',code:$('#cd').value.trim(),name:n,consent:true,cid});};
 }
 let lobbyMap,svgR;
 const dur=s=>s<60?s+' s':(Math.round(s/6)/10)+' min';
@@ -335,7 +347,7 @@ function lobby(){
   $('#shr').onclick=share;$('#inv').onclick=share;
   $('#cpy').onclick=async()=>{try{await navigator.clipboard.writeText(S.code);toast('Code copied',true)}catch(e){toast('Code: '+S.code,true)}};
   if($('#chg'))$('#chg').onclick=async()=>{if(await ask.confirm('Change the game code?','Players already in stay in. The old code stops working.',{ok:'Change code'}))send({t:'newcode'})};
-  if($('#rdy'))$('#rdy').onclick=()=>send({t:'ready',on:!me_.ready});
+  if($('#rdy'))$('#rdy').onclick=()=>{primeAwake();send({t:'ready',on:!me_.ready})};
   wireThemes();
   document.querySelectorAll('[data-pref]').forEach(b=>b.onclick=()=>send({t:'pref',pref:b.dataset.pref}));
   document.querySelectorAll('#home [data-kick]').forEach(b=>b.onclick=async()=>{if(await ask.confirm('Remove this player?','They will not be able to rejoin this game.',{ok:'Remove',danger:true}))send({t:'kick',id:b.dataset.kick})});
@@ -347,7 +359,7 @@ function lobby(){
     if($('#tgd'))$('#tgd').onclick=()=>toggleCfg('taggedMode',c.taggedMode==='watch'?'hunter':'watch');
     const push=()=>{const cfg={...S.cfg};document.querySelectorAll('[data-k]').forEach(i=>cfg[i.dataset.k]=+i.value);document.querySelectorAll('[data-b]').forEach(i=>cfg[i.dataset.b]=i.checked);send({t:'config',cfg})};
     document.querySelectorAll('[data-k],[data-b]').forEach(i=>i.onchange=push);
-    $('#go').onclick=async()=>{if(notReady>1&&!await ask.confirm('Start the game?',(notReady-1)+' player'+(notReady>2?'s are':' is')+' not ready yet.',{ok:'Start anyway'}))return;push();setTimeout(()=>send({t:'start'}),200)};
+    $('#go').onclick=async()=>{primeAwake();if(notReady>1&&!await ask.confirm('Start the game?',(notReady-1)+' player'+(notReady>2?'s are':' is')+' not ready yet.',{ok:'Start anyway'}))return;push();setTimeout(()=>send({t:'start'}),200)};
     const det=document.querySelector('#home details');
     det.addEventListener('toggle',()=>{lobby.open=det.open});
     const setM=m=>{lobby.mode=m;$('#m1').className=m==='spot'?'g':'g on';$('#m2').className=m==='spot'?'g on':'g'};

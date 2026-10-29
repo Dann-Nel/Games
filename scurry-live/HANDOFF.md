@@ -81,3 +81,4 @@ Measured with 70 bots and a 4x-throttled phone CPU (before -> after):
 - CI: `.github/workflows/android-apk.yml` builds the APK in GitHub Actions (needs repo variable SCURRY_URL). README in app/ explains install steps.
 - NOT verified: behaviour on a real phone with the screen locked (WebView JS + WebSocket staying alive in background is the open risk), Play Store release, iOS (needs Mac + Apple account).
 - Sandbox note: repo.maven.apache.org returned 429 here; local builds used a Google mirror via ~/.gradle/init.d/mirror.gradle (not committed; CI uses normal Maven Central).
+- iPhone note: every iOS browser (Chrome included) uses Apple's WebKit, so Chrome on iPhone has the same background limits as Safari. Added a NoSleep-style fallback (tiny looping muted video, started from the Host/Join/Start/Ready taps via primeAwake()) for browsers without the Wake Lock API. Unverified on a real iPhone.
