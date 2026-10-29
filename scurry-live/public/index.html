@@ -164,6 +164,8 @@ function bump(key,dir){
   else{const[lo,hi,st]=STEPS[key];c[key]=Math.min(hi,Math.max(lo,c[key]+dir*st))}
   send({t:'config',cfg:c});
 }
+const PRESETS={quick:{label:'Quick',huntSecs:900,hideSecs:60,pingEvery:60,radius:300,hold:120},classic:{label:'Classic',huntSecs:1800,hideSecs:180,pingEvery:120,radius:600,hold:240},big:{label:'Big',huntSecs:3600,hideSecs:300,pingEvery:180,radius:1500,hold:420}};
+const presetOf=c=>Object.keys(PRESETS).find(k=>['huntSecs','hideSecs','pingEvery','radius','hold'].every(f=>PRESETS[k][f]===c[f]));
 function toggleCfg(key,val){send({t:'config',cfg:{...S.cfg,[key]:val}})}
 function setTheme(t){store.set('sc_theme',t);document.body.classList.toggle('light',t==='light')}
 setTheme(store.get('sc_theme')||'dark');
@@ -184,23 +186,23 @@ function lobby(){
   $('#home').innerHTML=`<div class="top"><button id="lv">‹ Back</button><b>Lobby</b><button id="shr">Share</button></div>
   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><label style="margin:0">Game code</label><span><button class="lk" id="cpy">Copy</button>${H?'<button class="lk" id="chg">Change</button>':''}</span></div>
    <div style="display:flex;justify-content:space-between;align-items:center"><span class="big">${S.code}</span>${H?'<span class="pill">Hosting</span>':''}</div></div>
-  <div class="h3">House rules${H?'':' (set by host)'}</div><div class="card">
+  ${H?`<div class="h3">Game style</div><div class="card"><div class="seg">${Object.entries(PRESETS).map(([k,p])=>`<button class="g ${presetOf(c)===k?'on':''}" data-preset="${k}">${p.label}</button>`).join('')}</div>
+   <p class="s" style="margin:8px 0 0">${dur(c.huntSecs)} round · ${dur(c.hideSecs)} head start · ${c.zoneOn?c.radius+' m zone':'no zone'}. Fine-tune below.</p></div>
+  <div class="card">
    ${stepper('huntSecs','Round length',dur(c.huntSecs))}
-   ${stepper('pingEvery','Pings','Every '+dur(c.pingEvery))}
    ${stepper('hideSecs','Head start',dur(c.hideSecs))}
-   ${toggle('huntersTalk','Hunters can talk',c.huntersTalk)}
-   <div class="set"><span>When tagged<small>${c.taggedMode==='watch'?'Watch, '+dur(c.watchDelay)+' behind':'Join the hunters'}</small></span>${H?`<button class="sw ${c.taggedMode==='watch'?'on':''}" id="tgd" aria-label="When tagged"></button>`:''}</div>
-   ${toggle('zoneOn','Play zone',c.zoneOn)}
-   ${c.zoneOn?stepper('radius','Zone size',c.radius+' m · '+(S.center?'Map pin':'Around you')):''}
-   ${c.zoneOn?stepper('hold','Zone shrinks','Every '+dur(c.hold)):''}
-  </div>
-  <p class="s" style="margin:-4px 4px 12px">${c.zoneOn?`Shrinks every ${dur(c.hold)} after the head start: ${c.radius} m → ${fin} m, final size for the last ${dur(c.hold)}.`:'No play zone: the whole map is in bounds.'}</p>
+   ${stepper('pingEvery','Pings','Every '+dur(c.pingEvery))}
+   ${toggle('zoneOn','Play zone',c.zoneOn,c.zoneOn?'Shrinks over time':'')}
+   ${c.zoneOn?stepper('radius','Zone size',c.radius+' m'):''}
+   <div class="set"><span>When tagged<small>${c.taggedMode==='watch'?'Watch, '+dur(c.watchDelay)+' behind':'Join the hunters'}</small></span><button class="sw ${c.taggedMode==='watch'?'on':''}" id="tgd" aria-label="When tagged"></button></div>
+  </div>`:`<div class="card"><p class="s" style="margin:0">Set by the host: ${dur(c.huntSecs)} round · ${dur(c.hideSecs)} head start · pings every ${dur(c.pingEvery)} · ${c.zoneOn?c.radius+' m shrinking zone':'no zone'}.</p></div>`}
   <div class="h3">You play as</div><div class="card"><div class="seg">${['hunter','runner','random'].map(r=>`<button class="g ${S.you.pref===r?'on':''}" data-pref="${r}">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
-  <p class="s" style="margin:8px 0 0">With ${n} player${n===1?'':'s'}: ${hn} hunter${hn===1?'':'s'}. Random fills whichever team needs it. (${counts.hunter} want hunter, ${counts.runner} runner, ${counts.random} random.)</p></div>
+  <p class="s" style="margin:8px 0 0">${hn} hunter${hn===1?'':'s'} with ${n} player${n===1?'':'s'}. Random fills whichever team needs it.</p></div>
   <div class="h3">Players · ${n}/70</div><div class="card">${S.players.map(p=>`<div class="row"><span>${esc(p.name)}${p.id===S.you.id?' <small class="s">You</small>':''}${p.host?' <small class="s">· Host</small>':''}${p.online?'':' ·offline'}</span><span>${p.pref} · <span class="${p.ready?'rdy':'nrdy'}">${p.ready?'Ready':'Not ready'}</span>${H&&p.id!==S.you.id?` <button class="d" data-kick="${p.id}" style="width:auto;padding:4px 10px;margin:0 0 0 6px">Kick</button>`:''}</span></div>`).join('')||'<p class="s">Nobody here yet. Send your friends the link.</p>'}
    ${H?'':`<button class="${me_.ready?'g':''}" id="rdy">${me_.ready?'Not ready':'I\'m ready'}</button>`}</div>
   <div class="h3">Appearance</div><div class="card"><div class="seg"><button class="g ${document.body.classList.contains('light')?'on':''}" id="thl">Light</button><button class="g ${document.body.classList.contains('light')?'':'on'}" id="thd">Dark</button></div></div>
-  ${H?`<div class="card"><details ${lobby.open?'open':''}><summary>Advanced rules, map and safe spots</summary><div class="grid">
+  ${H?`<div class="card"><details ${lobby.open?'open':''}><summary>More options</summary><label><input type="checkbox" data-b="huntersTalk" ${c.huntersTalk?'checked':''} style="width:auto"> Hunters can talk (chat and voice)</label><div class="grid">
+   ${field('hold','Zone holds before shrinking (s)',c.hold)}
    ${field('hunterRatio','Hunter share (0.15 = 15%)',c.hunterRatio)}${field('stages','Shrinks (count)',c.stages)}
    ${field('shrink','Shrink duration (s)',c.shrink)}${field('outsideGrace','Outside-zone limit (s)',c.outsideGrace)}
    ${field('tagRange','Tag range (m)',c.tagRange)}${field('watchDelay','Spectator delay (s)',c.watchDelay)}
@@ -233,6 +235,7 @@ function lobby(){
   if(H){
     document.querySelectorAll('[data-bump]').forEach(b=>b.onclick=()=>bump(b.dataset.bump,+b.dataset.d));
     document.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>toggleCfg(b.dataset.tg,!S.cfg[b.dataset.tg]));
+    document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>{const p=PRESETS[b.dataset.preset];send({t:'config',cfg:{...S.cfg,huntSecs:p.huntSecs,hideSecs:p.hideSecs,pingEvery:p.pingEvery,radius:p.radius,hold:p.hold}})});
     if($('#tgd'))$('#tgd').onclick=()=>toggleCfg('taggedMode',c.taggedMode==='watch'?'hunter':'watch');
     const push=()=>{const cfg={...S.cfg};document.querySelectorAll('[data-k]').forEach(i=>cfg[i.dataset.k]=+i.value);document.querySelectorAll('[data-b]').forEach(i=>cfg[i.dataset.b]=i.checked);send({t:'config',cfg})};
     document.querySelectorAll('[data-k],[data-b]').forEach(i=>i.onchange=push);
