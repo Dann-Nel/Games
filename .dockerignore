@@ -1,0 +1,5 @@
+**/node_modules
+.git
+.github
+scurry-live/app
+scurry-live/sim*.js
