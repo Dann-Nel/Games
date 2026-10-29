@@ -16,7 +16,7 @@ function bot(name, pref) {
   ws.on('message', d => {
     const m = JSON.parse(d);
     if (m.t === 'joined') b.code = m.code;
-    if (m.t === 'state') b.state = m;
+    if (m.t === 'state') { if (!m.cfg && b.state) m.cfg = b.state.cfg; b.state = m; }
     if (m.t === 'event') b.events.push(m);
   });
   b.ready = new Promise(r => ws.on('open', r));

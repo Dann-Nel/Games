@@ -63,3 +63,14 @@ tag-code oracle/brute force, burst teleport bypass, malformed-URL crash, name XS
 
 ## Update (live zone map in the lobby)
 - The lobby now has a zone-preview map beside the settings (sticky at the top on phones, right column on wide screens). Solid ring = starting size (updates as Zone size / Style presets change), dashed = final size, green = safe spots, label shows the radius. Host taps the map to move the centre; guests see it read-only. The Leaflet node is kept across lobby re-renders (no flicker); it only refits when the ring leaves the view or gets tiny. "Add safe spot" / "Clear spots" are under More options.
+
+## Update (performance pass)
+Measured with 70 bots and a 4x-throttled phone CPU (before -> after):
+- In-game redraw: 271 ms median (557 worst) -> 6 ms (93 worst). Cause: every second the client destroyed and rebuilt every marker/ring, and read computed CSS per marker. Now markers update in place, canvas renderer, theme colours cached, redraws throttled.
+- Server -> phones: 551 KB/s -> 285 KB/s for 70 players. Settings (cfg) only sent when changed, coordinates rounded to 6 dp, identical state messages skipped (4 s keep-alive), other players' positions refreshed every 2 s. Static files are gzipped (index.html 56 KB -> 19 KB).
+- Server CPU is not the bottleneck (2-3% of a core at 70 players).
+- Smooth mode (default, toggle in More): dims map tiles by opacity instead of the per-tile invert filter (which cost ~40% of pan frame rate) and disables pulse animations.
+- GPS: poor-accuracy fixes now count as "signal alive" (no false "no GPS" / elimination); if no good fix for 20 s the best available fix is used; client falls back to low-accuracy positioning on GPS timeout.
+- Connection: "Reconnecting..." banner, exponential backoff, instant reconnect when the app returns to the foreground or the network comes back. Service worker caches map tiles and the Leaflet/LiveKit libraries.
+- Clients must treat `cfg` as optional in `state` messages and compute clock skew on arrival (`m.skew`).
+- Deploy: render.yaml now sets region: frankfurt. Render free instances sleep after ~15 min idle (30-60 s cold start): ping /healthz every 5 min with a free uptime monitor before an event.

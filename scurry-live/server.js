@@ -1,12 +1,13 @@
 'use strict';
 // Scurry Live: authoritative game server. One process, in-memory games, WebSocket + static files.
-const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
+const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), zlib = require('zlib');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const MAX_PLAYERS = 70;
 const PUB = path.join(__dirname, 'public');
 const games = new Map();
+const fileCache = new Map();   // path -> { mtime, raw, gz }: static files are gzipped once, not per request
 
 // ---------- static files ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.svg': 'image/svg+xml',
@@ -19,10 +20,21 @@ const server = http.createServer((req, res) => {
   if (p === '/') p = '/index.html';
   const f = path.normalize(path.join(PUB, p));
   if (!f.startsWith(PUB)) { res.writeHead(403); return res.end(); }
-  fs.readFile(f, (e, d) => {
-    if (e) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': path.basename(f) === 'sw.js' ? 'no-cache' : 'public, max-age=300' });
-    res.end(d);
+  fs.stat(f, (e, st) => {
+    if (e || !st.isFile()) { res.writeHead(404); return res.end('not found'); }
+    const hit = fileCache.get(f);
+    const send = c => {
+      const gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '') && c.gz;
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Vary': 'Accept-Encoding',
+        'Cache-Control': path.basename(f) === 'sw.js' ? 'no-cache' : 'public, max-age=300', ...(gz ? { 'Content-Encoding': 'gzip' } : {}) });
+      res.end(gz ? c.gz : c.raw);
+    };
+    if (hit && hit.mtime === st.mtimeMs) return send(hit);
+    fs.readFile(f, (e2, raw) => {
+      if (e2) { res.writeHead(404); return res.end('not found'); }
+      const text = /\.(html|js|svg|webmanifest|json)$/.test(f), c = { mtime: st.mtimeMs, raw, gz: text ? zlib.gzipSync(raw, { level: 9 }) : null };
+      fileCache.set(f, c); send(c);
+    });
   });
 });
 const wss = new WebSocketServer({ server, maxPayload: 8 * 1024 });
@@ -89,7 +101,7 @@ function makeCfg(inp = {}) {
 
 // ---------- game model ----------
 function createGame(cfgIn) {
-  const g = { code: newCode(), cfg: makeCfg(cfgIn), phase: 'lobby', players: new Map(), host: null, center: null,
+  const g = { code: newCode(), cfg: makeCfg(cfgIn), cfgV: 1, phase: 'lobby', players: new Map(), host: null, center: null,
     zones: [], spots: [], reports: [], drops: [], nextDropAt: 0, nextBountyAt: 0, dropNo: 0, startAt: 0, huntStart: 0, nextPingAt: 0, pingNo: 0, winner: null, chat: { hunters: [], runners: [] },
     touched: Date.now(), timer: null };
   games.set(g.code, g);
@@ -102,7 +114,7 @@ function addPlayer(g, name, ws) {
     loc: null, locT: 0, lastPing: null, tagCode: null, outsideSince: null, exposed: false, lastChat: 0,
     item: null, safe: false, safeUsed: 0, decoyNext: false, ghostNext: false,
     muted: false, badFixes: 0, lowAcc: 0, flags: 0, staleWarned: false, lastSos: 0, acc: null,
-    lastFixT: 0, ready: false, hist: [], lastTag: 0, tagFails: 0, tagLockUntil: 0, cid: null };
+    lastFixT: 0, vloc: null, anyT: 0, cfgSent: -1, lastKey: '', lastSentT: 0, ready: false, hist: [], lastTag: 0, tagFails: 0, tagLockUntil: 0, cid: null };
   g.players.set(p.id, p);
   return p;
 }
@@ -111,7 +123,7 @@ const connected = g => [...g.players.values()].filter(p => p.ws);
 // Seconds since a live player's last accepted fix, or 0 while it is fresh (or the player is not in play).
 const staleAge = (g, p, now) => {
   if ((g.phase !== 'hide' && g.phase !== 'hunt') || p.out || (p.role !== 'runner' && p.role !== 'hunter')) return 0;
-  const a = (now - Math.max(p.locT, g.startAt)) / 1000;
+  const a = (now - Math.max(p.locT, p.anyT, g.startAt)) / 1000;
   return a >= g.cfg.gpsStaleWarn ? Math.round(a) : 0;
 };
 const notifyHost = (g, text) => { const h = g.players.get(g.host); if (h) send(h.ws, { t: 'event', kind: 'warn', text }); };
@@ -191,12 +203,13 @@ function finish(g, winner) {
 }
 // Privacy: location data is deleted the moment a game ends (and again on rematch).
 function wipeLocations(g) {
-  for (const p of g.players.values()) { p.loc = null; p.locT = 0; p.acc = null; p.hist = []; p.lastPing = null; p.exposed = false; p.outsideSince = null; }
+  for (const p of g.players.values()) { p.loc = null; p.vloc = null; p.locT = 0; p.acc = null; p.hist = []; p.lastPing = null; p.exposed = false; p.outsideSince = null; }
   g.drops = [];
 }
 
 function tick(g) {
   const now = Date.now();
+  if (now - (g.snapT || 0) >= 2000) { g.snapT = now; for (const q of g.players.values()) q.vloc = q.loc && { lat: q.loc.lat, lng: q.loc.lng, t: q.locT, acc: q.acc }; }   // what other players are shown: refreshed every 2 s, not every fix
   for (const p of g.players.values()) {                       // GPS-loss detection
     const age = staleAge(g, p, now);
     if (age) {
@@ -258,20 +271,30 @@ function tick(g) {
     if (active(g, 'runner').length === 0) finish(g, 'hunters');
     else if (now >= g.huntStart + g.cfg.huntSecs * 1000) finish(g, 'runners');
   }
-  for (const p of g.players.values()) if (p.ws) send(p.ws, view(g, p, now));
+  for (const p of g.players.values()) {
+    if (!p.ws) continue;
+    const v = view(g, p, now), had = v.cfg !== undefined;
+    v.now = 0; const key = JSON.stringify(v);
+    if (key === p.lastKey && now - p.lastSentT < 4000) continue;   // nothing changed: save the phone's data and battery
+    p.lastKey = key; p.lastSentT = now; v.now = now; if (had) p.cfgSent = g.cfgV;
+    send(p.ws, v);
+  }
   if (now - g.touched > 3 * 3600 * 1000 || (connected(g).length === 0 && now - g.touched > 30 * 60 * 1000)) {
     clearInterval(g.timer); games.delete(g.code);
   }
 }
 
+const r6 = n => Math.round(n * 1e6) / 1e6;    // ~0.1 m: more digits only cost bandwidth
+const rz = z => z && { lat: r6(z.lat), lng: r6(z.lng), r: Math.round(z.r * 10) / 10 };
 function view(g, p, now) {
-  const v = { t: 'state', now, code: g.code, phase: g.phase, cfg: g.cfg, host: g.host === p.id, center: g.center,
+  const v = { t: 'state', now, code: g.code, phase: g.phase, host: g.host === p.id, center: g.center,
     you: { id: p.id, name: p.name, role: p.role, out: p.out, pref: p.pref, exposed: p.exposed,
       tagCode: p.tagCode || undefined, outsideSince: p.outsideSince || undefined,
       item: p.item, safe: p.safe, safeLeft: Math.max(0, g.cfg.safeSecs - p.safeUsed / 1000),
       stale: staleAge(g, p, now), muted: p.muted },
     winner: g.winner, spots: g.spots, drops: g.phase === 'lobby' ? [] : g.drops };
   // The host's roster deliberately omits roles, so hosting never reveals who is a hunter.
+  if (p.cfgSent !== g.cfgV) v.cfg = g.cfg;                     // settings only travel when they change
   if (g.host === p.id) v.roster = [...g.players.values()].map(q => ({ id: q.id, name: q.name, muted: q.muted, online: !!q.ws, stale: staleAge(g, q, now), flags: q.flags, reports: g.reports.filter(r => r.about === q.id).length }));
   if (g.host === p.id) v.reports = g.reports.slice(-30);
   if (g.phase === 'lobby') {
@@ -281,7 +304,7 @@ function view(g, p, now) {
   v.counts = { runners: active(g, 'runner').length, hunters: active(g, 'hunter').length, total: g.players.size };
   v.huntStart = g.huntStart; v.huntEnd = g.huntStart + g.cfg.huntSecs * 1000;
   v.nextPingAt = g.phase === 'hunt' ? g.nextPingAt : null;
-  v.zone = zoneAt(g, now);
+  const zz = zoneAt(g, now); v.zone = { ...zz, cur: rz(zz.cur), next: rz(zz.next) };
   const m = [];
   const hunterSide = p.role === 'hunter';
   if (p.role === 'spectator') {                               // tagged "watch" mode: everyone, but only as they were watchDelay seconds ago
@@ -289,7 +312,7 @@ function view(g, p, now) {
     for (const q of g.players.values()) {
       if (q.id === p.id || (q.role !== 'runner' && q.role !== 'hunter') || q.out && q.role !== 'hunter') continue;
       let h = null; for (let i = q.hist.length - 1; i >= 0; i--) if (q.hist[i].t <= at) { h = q.hist[i]; break; }
-      if (h) m.push({ id: q.id, name: q.name, kind: 'watch', role: q.role, lat: h.lat, lng: h.lng, t: h.t, acc: h.acc });
+      if (h) m.push({ id: q.id, name: q.name, kind: 'watch', role: q.role, lat: r6(h.lat), lng: r6(h.lng), t: h.t, acc: h.acc });
     }
     v.markers = m; return v;
   }
@@ -297,14 +320,14 @@ function view(g, p, now) {
     if (q.id === p.id) continue;
     const base = { id: q.id, name: q.name };
     if (hunterSide) {
-      if (q.role === 'hunter' && q.loc) m.push({ ...base, kind: 'ally', lat: q.loc.lat, lng: q.loc.lng, t: q.locT, acc: q.acc });
+      if (q.role === 'hunter' && q.vloc) m.push({ ...base, kind: 'ally', lat: r6(q.vloc.lat), lng: r6(q.vloc.lng), t: q.vloc.t, acc: q.vloc.acc });
       else if (q.role === 'runner' && !q.out) {
-        if (q.exposed && q.loc) m.push({ ...base, kind: 'exposed', lat: q.loc.lat, lng: q.loc.lng, t: q.locT, acc: q.acc });
-        else if (q.lastPing) m.push({ ...base, kind: 'ping', lat: q.lastPing.lat, lng: q.lastPing.lng, t: q.lastPing.t, acc: q.lastPing.acc });
+        if (q.exposed && q.vloc) m.push({ ...base, kind: 'exposed', lat: r6(q.vloc.lat), lng: r6(q.vloc.lng), t: q.vloc.t, acc: q.vloc.acc });
+        else if (q.lastPing) m.push({ ...base, kind: 'ping', lat: r6(q.lastPing.lat), lng: r6(q.lastPing.lng), t: q.lastPing.t, acc: q.lastPing.acc });
       }
     } else {
-      if (q.role === 'runner' && q.loc) m.push({ ...base, kind: 'ally', lat: q.loc.lat, lng: q.loc.lng, t: q.locT, acc: q.acc });
-      else if (q.role === 'hunter' && g.cfg.pingRevealsHunters && q.lastPing) m.push({ ...base, kind: 'ping', lat: q.lastPing.lat, lng: q.lastPing.lng, t: q.lastPing.t, acc: q.lastPing.acc });
+      if (q.role === 'runner' && q.vloc) m.push({ ...base, kind: 'ally', lat: r6(q.vloc.lat), lng: r6(q.vloc.lng), t: q.vloc.t, acc: q.vloc.acc });
+      else if (q.role === 'hunter' && g.cfg.pingRevealsHunters && q.lastPing) m.push({ ...base, kind: 'ping', lat: r6(q.lastPing.lat), lng: r6(q.lastPing.lng), t: q.lastPing.t, acc: q.lastPing.acc });
     }
   }
   v.markers = m;
@@ -382,7 +405,7 @@ function handle(ws, m) {
     const p = g && [...g.players.values()].find(q => q.token === m.token);
     if (!p) return send(ws, { t: 'gone' });
     if (p.ws && p.ws !== ws) p.ws.close();
-    p.ws = ws; ws.gcode = g.code; ws.pid = p.id;
+    p.ws = ws; p.cfgSent = -1; p.lastKey = ''; ws.gcode = g.code; ws.pid = p.id;
     send(ws, { t: 'joined', code: g.code, token: p.token, id: p.id });
     const ch = chanFor(p);
     if (ch) for (const c of g.chat[ch]) send(ws, c);
@@ -405,7 +428,7 @@ function handle(ws, m) {
       break;
     }
     case 'config':
-      if (g.host === p.id && g.phase === 'lobby') g.cfg = makeCfg(m.cfg);
+      if (g.host === p.id && g.phase === 'lobby') { g.cfg = makeCfg(m.cfg); g.cfgV++; }
       break;
     case 'center':
       if (g.host === p.id && g.phase === 'lobby' && validLoc(m.lat, m.lng)) g.center = { lat: m.lat, lng: m.lng };
@@ -431,13 +454,15 @@ function handle(ws, m) {
       if (!validLoc(m.lat, m.lng) || g.phase === 'over') return;
       const now = Date.now(); if (now - p.lastFixT < 900) return; p.lastFixT = now;   // counts rejected fixes too, so a burst can't skip the 5-fix wait
       // Anti-cheat 1: ignore fixes the phone itself says are too imprecise.
+      let poor = false;
       if (typeof m.acc === 'number' && m.acc > g.cfg.maxAccuracy) {
+        p.anyT = now;                                             // the phone is reporting, so this is not "no GPS"
         if (++p.lowAcc === 3) send(ws, { t: 'event', kind: 'warn', text: `GPS accuracy is poor (±${Math.round(m.acc)} m). Move to open sky.` });
-        return;
-      }
-      p.lowAcc = 0;
+        if (p.loc && now - p.locT < 20000 || m.acc > 300) return;  // a good fix is recent (or this one is useless): ignore it
+        poor = true;                                              // no good fix for 20 s: use the best available so the player is not invisible
+      } else p.lowAcc = 0;
       // Anti-cheat 2: reject impossible jumps. A persistent jump (5 fixes in a row) is accepted but flagged to the host.
-      if (g.cfg.maxSpeed > 0 && p.loc && g.phase !== 'lobby') {
+      if (!poor && g.cfg.maxSpeed > 0 && p.loc && g.phase !== 'lobby') {
         const dt = Math.max(1, (now - p.locT) / 1000), d = dist(p.loc, { lat: m.lat, lng: m.lng });
         if (d > g.cfg.maxSpeed * dt + 30) {
           if (++p.badFixes < 5) return;

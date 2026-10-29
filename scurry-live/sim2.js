@@ -13,7 +13,7 @@ function bot(i, pref) {
   ws.on('message', d => {
     const m = JSON.parse(d);
     if (m.t === 'joined') b.code = m.code;
-    if (m.t === 'state') b.state = m;
+    if (m.t === 'state') { if (!m.cfg && b.state) m.cfg = b.state.cfg; b.state = m; }
     if (m.t === 'event') b.events.push(m);
     if (m.t === 'chat') b.chats.push(m);
     if (m.t === 'error') b.errors.push(m.text);

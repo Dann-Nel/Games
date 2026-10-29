@@ -7,4 +7,5 @@ services:
     buildCommand: npm install
     startCommand: node server.js
     plan: free
+    region: frankfurt   # closest Render region to South Africa; Oregon adds ~300 ms to every request
     healthCheckPath: /healthz

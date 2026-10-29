@@ -21,10 +21,12 @@ button,.lbl{-webkit-user-select:none;user-select:none;touch-action:manipulation}
 #game{height:100vh;height:100dvh}
 #bg{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 140px);z-index:650;background:var(--bad);color:#fff;font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
 .rep{margin-left:6px;opacity:.6;font-size:12px}
-[data-theme=ember] .leaflet-tile-pane,[data-theme=neon] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.8) contrast(.85) saturate(.5)}
+html:not(.lite)[data-theme=ember] .leaflet-tile-pane,html:not(.lite)[data-theme=neon] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.8) contrast(.85) saturate(.5)}
 .leaflet-container{background:var(--bg)}
 .meDot{animation:pls 1.8s ease-in-out infinite}.expo{animation:pls .8s ease-in-out infinite}
 @keyframes pls{50%{opacity:.45}}
+.lite .meDot,.lite .expo{animation:none}
+.lite[data-theme=ember] .leaflet-tile-pane,.lite[data-theme=neon] .leaflet-tile-pane{opacity:.45}   /* smooth mode: dim the tiles only (cheap), keep rings and markers bright */
 .tp{display:flex;gap:8px}.tp button{margin:0;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:14px}
 .tp i{display:flex;width:100%;height:14px;border-radius:5px;overflow:hidden;outline:1px solid var(--line);outline-offset:-1px}.tp i b{flex:1}
 #pv{position:fixed;right:0;top:40%;z-index:1000;width:auto;margin:0;padding:14px 6px;border-radius:10px 0 0 10px;font-size:12px;writing-mode:vertical-rl;box-shadow:0 2px 10px #0006}
@@ -76,6 +78,7 @@ button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);
 @media(min-width:600px){#dlg{align-items:center}#dlg .sh{border-radius:20px}}
 #hostp{position:absolute;left:0;right:0;bottom:0;z-index:700;height:70%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #hl{flex:1;overflow:auto}
+#net{position:fixed;left:0;right:0;top:0;z-index:3000;background:var(--warn);color:#000;font-weight:700;text-align:center;padding:calc(env(safe-area-inset-top) + 6px) 10px 6px;display:none;font-size:14px}
 #toast{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:1500;background:var(--acc);color:var(--acc-ink);font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
 #chat{position:absolute;left:0;right:0;bottom:0;z-index:700;height:55%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #msgs{flex:1;overflow:auto;font-size:15px}#msgs b{color:var(--acc)}
@@ -101,7 +104,7 @@ details summary{cursor:pointer;color:var(--mut);padding:6px 0}
 .lbl{background:#000a;color:#fff;border:0;border-radius:4px;font-size:11px;padding:1px 4px}
 </style></head><body>
 <div id="home" class="pg"></div>
-<div id="toast"></div>
+<div id="toast"></div><div id="net">Connection lost. Reconnecting... (your game is safe)</div>
 
 <div id="game">
   <div id="map"></div>
@@ -121,22 +124,27 @@ details summary{cursor:pointer;color:var(--mut);padding:6px 0}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sosList=[];
-let ws,S=null,token=null,code=null,me=null,map,L_=window.L,layers={},myPos=null,wake=null,audioCtx,lkRoom,micOn=false,cfgDraft={};
+let cfgCache=null,ws,S=null,token=null,code=null,me=null,map,L_=window.L,layers={},myPos=null,wake=null,audioCtx,lkRoom,micOn=false,cfgDraft={};
 const cid=(()=>{try{let c=localStorage.getItem('sc_cid');if(!c){c=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('sc_cid',c)}return c}catch(e){return null}})();
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
 
 // ---------- connection ----------
+let retry=0,netTimer=null;
+function netBanner(on){const el=$('#net');if(!el)return;if(on){if(!netTimer)netTimer=setTimeout(()=>{el.style.display='block'},2500)}else{clearTimeout(netTimer);netTimer=null;el.style.display='none'}}
 function connect(then){
+  if(ws&&(ws.readyState===0||ws.readyState===1)&&!then)return;
   ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
-  ws.onopen=()=>{ const t=store.get('sc_token'),c=store.get('sc_code'); if(t&&c&&!then)send({t:'resume',code:c,token:t}); else if(then)then(); else render(); };
+  ws.onopen=()=>{retry=0;netBanner(false);const t=store.get('sc_token'),c=store.get('sc_code');if(t&&c&&!then)send({t:'resume',code:c,token:t});else if(then)then();else render();};
   ws.onmessage=e=>onMsg(JSON.parse(e.data));
-  ws.onclose=()=>{ setTimeout(()=>connect(),1500) };
+  ws.onclose=()=>{netBanner(true);setTimeout(()=>connect(),Math.min(8000,1000*Math.pow(1.6,retry++)))};
+  ws.onerror=()=>{try{ws.close()}catch(e){}};
 }
+addEventListener('online',()=>connect());
 const send=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
 function onMsg(m){
   if(m.t==='joined'){token=m.token;code=m.code;me=m.id;store.set('sc_token',token);store.set('sc_code',code);}
   else if(m.t==='gone'){store.set('sc_token','');S=null;render();}
-  else if(m.t==='state'){S=m;render();}
+  else if(m.t==='state'){if(m.cfg)cfgCache=m.cfg;else m.cfg=cfgCache;m.skew=m.now-Date.now();S=m;render();}
   else if(m.t==='event'){toast(m.text);if(['ping','hunt','warn','out','over','item'].includes(m.kind))alertUser(m.kind);}
   else if(m.t==='chat')addChat(m);
   else if(m.t==='error')toast(m.text);
@@ -181,17 +189,22 @@ function alertUser(k){beep({ping:740,hunt:1000,warn:300,out:400,over:520}[k]||80
 // ---------- geolocation ----------
 function watchGPS(){
   if(watchGPS.id||!navigator.geolocation)return;
+  const low=!!watchGPS.low;
   watchGPS.id=navigator.geolocation.watchPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc});},
-    e=>{if(Date.now()-(watchGPS.lastErr||0)>30000){watchGPS.lastErr=Date.now();toast('GPS: '+e.message+'. Location must be allowed.',true)}},{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+    e=>{
+      if(e.code===3&&!watchGPS.low){watchGPS.low=true;navigator.geolocation.clearWatch(watchGPS.id);watchGPS.id=null;watchGPS();return}   // timeout: retry with network/Wi-Fi positioning
+      if(Date.now()-(watchGPS.lastErr||0)>30000){watchGPS.lastErr=Date.now();toast(e.code===1?'Location is blocked. Allow it in your browser settings.':'GPS signal weak. Move to open sky.')}
+    },low?{enableHighAccuracy:false,maximumAge:10000,timeout:30000}:{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 // The server asks for this a few seconds before every ping so the revealed dot is as fresh and precise as possible.
 function freshFix(){if(!navigator.geolocation)return;
-  navigator.geolocation.getCurrentPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc})},()=>{},{enableHighAccuracy:true,maximumAge:0,timeout:4000})}
+  navigator.geolocation.getCurrentPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc})},()=>{},{enableHighAccuracy:true,maximumAge:3000,timeout:6000})}
 function stopGPS(){if(watchGPS.id){navigator.geolocation.clearWatch(watchGPS.id);watchGPS.id=null}myPos=null}
 async function keepAwake(){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
 let hiddenAt=0;
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){hiddenAt=Date.now();return}
+  if(!PREVIEW&&(!ws||ws.readyState>1))connect();
   if(S&&S.phase!=='lobby'){keepAwake();freshFix();
     if(S.phase!=='over'&&hiddenAt&&Date.now()-hiddenAt>8000){const b=$('#bg');b.style.display='block';setTimeout(()=>b.style.display='none',6000)}}
   hiddenAt=0;
@@ -206,7 +219,7 @@ function render(){
   else if(S&&(S.phase==='hide'||S.phase==='hunt'))watchGPS(); // also covers a reload mid-game
   if(!S){$('#game').style.display='none';$('#home').style.display='block';return home();}
   if(S.phase==='lobby'){$('#game').style.display='none';$('#home').style.display='block';return lobby();}
-  $('#home').style.display='none';$('#game').style.display='block';game();
+  $('#home').style.display='none';$('#game').style.display='block';game(true);
 }
 function home(){
   if($('#home').dataset.mode==='home')return; $('#home').dataset.mode='home';$('#home').classList.remove('lob');
@@ -223,7 +236,7 @@ function home(){
   $('#mk').onclick=()=>{const n=nm();if(!n)return;watchGPS();send({t:'create',name:n,consent:true,cid});};
   $('#jn').onclick=()=>{const n=nm();if(!n)return;watchGPS();send({t:'join',code:$('#cd').value.trim(),name:n,consent:true,cid});};
 }
-let lobbyMap;
+let lobbyMap,svgR;
 const dur=s=>s<60?s+' s':(Math.round(s/6)/10)+' min';
 const PINGS=[30,60,90,120,180,300,600];
 const STEPS={huntSecs:[600,7200,300],hideSecs:[60,1800,60],radius:[50,5000,50],hold:[60,1800,60]};
@@ -237,10 +250,12 @@ const PRESETS={quick:{label:'Quick',huntSecs:900,hideSecs:60,pingEvery:60,radius
 const presetOf=c=>Object.keys(PRESETS).find(k=>['huntSecs','hideSecs','pingEvery','radius','hold'].every(f=>PRESETS[k][f]===c[f]));
 function toggleCfg(key,val){send({t:'config',cfg:{...S.cfg,[key]:val}})}
 const THEMES={ember:'Ember',neon:'Neon',outdoor:'Outdoor'};
-const T=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const _tc={};const T=n=>_tc[n]||(_tc[n]=getComputedStyle(document.documentElement).getPropertyValue(n).trim());   // cached: reading computed style per marker was slow
 const tileUrl=()=>'https://tile.openstreetmap.org/{z}/{x}/{y}.png';   // dark themes darken these with a CSS filter (no tile API key needed)
-function setTiles(m){if(!m)return;if(m._tl)m.removeLayer(m._tl);m._tl=L_.tileLayer(tileUrl(),{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m)}
-function applyTheme(t){t={dark:'ember',light:'outdoor'}[t]||t;if(!THEMES[t])t='ember';document.documentElement.dataset.theme=t;
+function setTiles(m){if(!m)return;if(m._tl)m.removeLayer(m._tl);m._tl=L_.tileLayer(tileUrl(),{maxZoom:19,attribution:'© OpenStreetMap',updateWhenIdle:true,updateWhenZooming:false,keepBuffer:1}).addTo(m)}
+const isLite=()=>store.get('sc_lite')!=='0';   // smooth mode is the default: dims the map with an overlay instead of filtering every tile
+function applyLite(){document.documentElement.classList.toggle('lite',isLite())}applyLite();
+function applyTheme(t){t={dark:'ember',light:'outdoor'}[t]||t;if(!THEMES[t])t='ember';document.documentElement.dataset.theme=t;for(const k in _tc)delete _tc[k];
   const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=T('--bg');return t}
 function setTheme(t){t=applyTheme(t);store.set('sc_theme',t);setTiles(map);setTiles(lobbyMap);
   $('#home').dataset.mode='';lobby.sig=null;render()}
@@ -360,12 +375,13 @@ setInterval(zoneMapUpdate,1500);
 // ---------- game ----------
 function initMap(){
   if(map)return;
-  map=L_.map('map',{zoomControl:false}).setView([S.center.lat,S.center.lng],16);
+  map=L_.map('map',{zoomControl:false,preferCanvas:true}).setView([S.center.lat,S.center.lng],16);
+  svgR=L_.svg();
   setTiles(map);
   layers={cur:L_.circle([0,0],{radius:1,color:'#e5383b',weight:3,fillColor:'#e5383b',fillOpacity:.05}).addTo(map),
     next:L_.circle([0,0],{radius:1,color:'#fff',weight:2,dashArray:'8 8',fill:false}).addTo(map),
     meAcc:L_.circle([0,0],{radius:1,color:'#ff2d2d',weight:1,fillOpacity:.12,interactive:false}).addTo(map),
-    me:L_.circleMarker([0,0],{radius:9,color:'#fff',fillColor:'#ff2d2d',fillOpacity:1,weight:4,className:'meDot'}).addTo(map),
+    me:L_.circleMarker([0,0],{radius:9,color:'#fff',fillColor:'#ff2d2d',fillOpacity:1,weight:4,className:'meDot',renderer:svgR}).addTo(map),
     mk:L_.layerGroup().addTo(map),fx:L_.layerGroup().addTo(map)};
   map.invalidateSize();
   layers.cur.setLatLng([S.center.lat,S.center.lng]).setRadius(S.cfg.radius);
@@ -373,24 +389,52 @@ function initMap(){
   window.addEventListener('resize',()=>map.invalidateSize());
 }
 const fmt=ms=>{ms=Math.max(0,Math.ceil(ms/1000));return Math.floor(ms/60)+':'+String(ms%60).padStart(2,'0')};
-function game(){
+const mkc=new Map();let fxSig='',dropLayers=[],zoneSig='';
+function game(force){
+  const nowT=Date.now(),gap=isLite()?900:400;
+  if(!force&&nowT-(game.last||0)<gap)return;game.last=nowT;
   initMap();keepAwake();
-  const z=S.zone,y=S.you,skew=S.now-Date.now(),now=Date.now()+skew;
-  const zc=T('--zone');layers.cur.setLatLng([z.cur.lat,z.cur.lng]).setRadius(z.cur.r).setStyle({color:zc,fillColor:zc,opacity:S.cfg.zoneOn?1:0,fillOpacity:S.cfg.zoneOn?.06:0});
-  if(z.next&&S.cfg.zoneOn)layers.next.setLatLng([z.next.lat,z.next.lng]).setRadius(z.next.r).setStyle({opacity:1,color:T('--nz')});else layers.next.setStyle({opacity:0});
-  if(myPos){layers.me.setLatLng([myPos.lat,myPos.lng]).setStyle({fillColor:T('--me')});layers.meAcc.setLatLng([myPos.lat,myPos.lng]).setRadius(Math.max(myPos.acc||1,1)).setStyle({color:T('--me'),fillColor:T('--me')});}
-  layers.fx.clearLayers();
-  for(const s of S.spots)L_.circle([s.lat,s.lng],{radius:S.cfg.safeRadius,color:T('--ok'),weight:2,dashArray:'4 4',fillOpacity:.25}).bindTooltip('Safe spot',{className:'lbl'}).addTo(layers.fx);
-  for(const d of S.drops)L_.circleMarker([d.lat,d.lng],{radius:11,color:'#fff',weight:3,fillColor:'#b455ff',fillOpacity:1}).bindTooltip('Supply drop · '+fmt(d.expires-now),{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);
-  for(const s of sosList)if(s.lat!=null&&now-s.at<600000)L_.circleMarker([s.lat,s.lng],{radius:14,color:'#fff',weight:3,fillColor:'#ff0000',fillOpacity:.9}).bindTooltip('SOS: '+esc(s.name),{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);
-  layers.mk.clearLayers();
+  const z=S.zone,y=S.you,skew=S.skew||0,now=nowT+skew;
+  // zone rings: only touch the map when something changed
+  const zs=[z.cur.lat,z.cur.lng,Math.round(z.cur.r),z.next&&Math.round(z.next.r),S.cfg.zoneOn,document.documentElement.dataset.theme].join();
+  if(zs!==zoneSig){zoneSig=zs;const zc=T('--zone');
+    layers.cur.setLatLng([z.cur.lat,z.cur.lng]).setRadius(z.cur.r).setStyle({color:zc,fillColor:zc,opacity:S.cfg.zoneOn?1:0,fillOpacity:S.cfg.zoneOn?.06:0});
+    if(z.next&&S.cfg.zoneOn)layers.next.setLatLng([z.next.lat,z.next.lng]).setRadius(z.next.r).setStyle({opacity:1,color:T('--nz')});else layers.next.setStyle({opacity:0});}
+  if(myPos){const k=myPos.lat+','+myPos.lng+','+Math.round(myPos.acc||0)+document.documentElement.dataset.theme;if(k!==game.me){game.me=k;layers.me.setLatLng([myPos.lat,myPos.lng]).setStyle({fillColor:T('--me')});layers.meAcc.setLatLng([myPos.lat,myPos.lng]).setRadius(Math.max(myPos.acc||1,1)).setStyle({color:T('--me'),fillColor:T('--me')})}}
+  // safe spots, supply drops, SOS: rebuilt only when the set changes; countdown labels update in place
+  const sos=sosList.filter(s=>s.lat!=null&&now-s.at<600000);
+  const fs=JSON.stringify([S.spots,S.drops.map(d=>d.id),sos.length,S.cfg.safeRadius,document.documentElement.dataset.theme]);
+  if(fs!==fxSig){fxSig=fs;layers.fx.clearLayers();dropLayers=[];
+    for(const s of S.spots)L_.circle([s.lat,s.lng],{radius:S.cfg.safeRadius,color:T('--ok'),weight:2,dashArray:'4 4',fillOpacity:.25}).bindTooltip('Safe spot',{className:'lbl'}).addTo(layers.fx);
+    for(const d of S.drops){const l=L_.circleMarker([d.lat,d.lng],{radius:11,color:'#fff',weight:3,fillColor:'#b455ff',fillOpacity:1}).bindTooltip('',{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);dropLayers.push([l,d])}
+    for(const s of sos)L_.circleMarker([s.lat,s.lng],{radius:14,color:'#fff',weight:3,fillColor:'#ff0000',fillOpacity:.9}).bindTooltip('SOS: '+esc(s.name),{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);}
+  for(const[l,d]of dropLayers){const t='Supply drop · '+fmt(d.expires-now);if(l._t!==t){l._t=t;l.setTooltipContent(t)}}
+  // players: update existing markers in place instead of rebuilding all of them every second
+  const seen=new Set();
   for(const m of S.markers){
-    const age=Math.round((now-m.t)/1000);
+    const age=Math.round((now-m.t)/1000),key=m.id+(m.kind==='watch'?'w':''),live=m.kind!=='ally'&&m.kind!=='watch';
     const col=m.kind==='watch'?(m.role==='hunter'?T('--bad'):T('--ok')):{ally:T('--ok'),ping:T('--warn'),exposed:T('--expo')}[m.kind];
-    if(m.acc>8)L_.circle([m.lat,m.lng],{radius:m.acc,color:col,weight:1,fillOpacity:.08,interactive:false}).addTo(layers.mk);  // accuracy ring
-    const c=L_.circleMarker([m.lat,m.lng],{radius:m.kind==='ally'||m.kind==='watch'?6:9,color:'#fff',weight:2,fillColor:col,fillOpacity:m.kind==='ping'?Math.max(.35,1-age/(S.cfg.pingEvery*2)):1,className:m.kind==='exposed'?'expo':''}).addTo(layers.mk);
-    c.bindTooltip(m.kind==='ally'||m.kind==='watch'?esc(m.name):`${esc(m.name)} · ${m.kind==='ping'?'last ping '+age+'s ago':'EXPOSED live'}${m.acc?' ±'+m.acc+'m':''}`,{permanent:m.kind!=='ally'&&m.kind!=='watch',direction:'top',className:'lbl'});
+    const op=m.kind==='ping'?Math.round(Math.max(.35,1-age/(S.cfg.pingEvery*2))*20)/20:1;
+    const txt=m.kind==='ally'||m.kind==='watch'?esc(m.name):`${esc(m.name)} · ${m.kind==='ping'?'last ping '+age+'s ago':'EXPOSED live'}${m.acc?' ±'+m.acc+'m':''}`;
+    seen.add(key);
+    let e=mkc.get(key);
+    if(!e||e.kind!==m.kind){
+      if(e){layers.mk.removeLayer(e.c);if(e.r)layers.mk.removeLayer(e.r)}
+      e={kind:m.kind,r:null,ring:0,pos:'',col:'',op:-1,txt:''};
+      e.c=L_.circleMarker([m.lat,m.lng],{radius:m.kind==='ally'||m.kind==='watch'?6:9,color:'#fff',weight:2,fillColor:col,fillOpacity:op,className:m.kind==='exposed'?'expo':'',renderer:m.kind==='exposed'?svgR:undefined}).addTo(layers.mk);
+      e.c.bindTooltip(txt,{permanent:live,direction:'top',className:'lbl'});e.txt=txt;mkc.set(key,e);
+    }
+    const pos=m.lat+','+m.lng;
+    if(pos!==e.pos){e.pos=pos;e.c.setLatLng([m.lat,m.lng])}
+    if(col!==e.col||op!==e.op){e.col=col;e.op=op;e.c.setStyle({fillColor:col,fillOpacity:op})}
+    if(txt!==e.txt){e.txt=txt;e.c.setTooltipContent(txt)}
+    const ring=m.acc>8?m.acc:0;                                        // accuracy ring
+    if(ring&&!e.r){e.r=L_.circle([m.lat,m.lng],{radius:ring,color:col,weight:1,fillOpacity:.08,interactive:false}).addTo(layers.mk)}
+    else if(!ring&&e.r){layers.mk.removeLayer(e.r);e.r=null}
+    else if(e.r){if(pos!==e.rpos)e.r.setLatLng([m.lat,m.lng]);if(ring!==e.ring)e.r.setRadius(ring);e.r.setStyle({color:col})}
+    e.rpos=pos;e.ring=ring;
   }
+  for(const[k,e]of mkc)if(!seen.has(k)){layers.mk.removeLayer(e.c);if(e.r)layers.mk.removeLayer(e.r);mkc.delete(k)}
   const role=y.out?(y.role==='hunter'?'HUNTER (caught)':'SPECTATOR'):y.role.toUpperCase();
   $('#hrole').textContent=role;const rc=y.role==='hunter'?'var(--bad)':y.role==='runner'&&!y.out?'var(--ok)':'var(--mut)';$('#hud').style.setProperty('--rolec',rc);$('#hrole').style.color=rc;$('#hcount').textContent=`${S.counts.runners} runners · ${S.counts.hunters} hunters`;
   if(S.phase==='over'){
@@ -424,15 +468,16 @@ function game(){
 function moreSheet(open){
   const el=$('#more');if(open)el.style.display='flex';
   if(el.style.display!=='flex'||!S||!S.you)return;
-  const y=S.you,sig=JSON.stringify([y.role,y.out,y.tagCode,S.host,S.phase,document.documentElement.dataset.theme]);
+  const y=S.you,sig=JSON.stringify([y.role,y.out,y.tagCode,S.host,S.phase,document.documentElement.dataset.theme,isLite()]);
   if(!open&&sig===moreSheet.sig)return;moreSheet.sig=sig;
   let b='';
   if(y.role==='runner'&&!y.out&&S.phase!=='over')b+=`<div class="card"><label style="margin:0">Backup code</label><div class="big">${esc(y.tagCode||'')}</div><p class="s" style="margin:4px 0 0">Only if a hunter tagged you and the app did not register it: tell them this code. Normally just use the red button.</p></div>`;
   if(y.role==='hunter'&&S.phase==='hunt')b+='<button class="g" id="mcode">Enter a runner\'s code</button>';
   if(S.host)b+='<button class="g" id="mhost">Host controls</button>';
-  b+=`<div class="h3">Theme</div>${themePicker()}<button class="g" id="mclose">Close</button>`;
+  b+=`<div class="h3">Theme</div>${themePicker()}<div class="set" style="margin-top:8px"><span>Smooth mode<small>Easier on battery and older phones. Turn off for a fancier dark map.</small></span><button class="sw ${isLite()?'on':''}" id="mlite" aria-label="Smooth mode"></button></div><button class="g" id="mclose">Close</button>`;
   $('#mbody').innerHTML=b;wireThemes();
   $('#mclose').onclick=()=>{el.style.display='none'};
+  $('#mlite').onclick=()=>{store.set('sc_lite',isLite()?'0':'1');applyLite();moreSheet(true)};
   if($('#mhost'))$('#mhost').onclick=()=>{el.style.display='none';hostPanel(true)};
   if($('#mcode'))$('#mcode').onclick=async()=>{const c=await ask.code('Runner\'s code','Only if a runner you tagged will not report it: enter their 4-digit code.');if(c){el.style.display='none';send({t:'tag',code:c})}};
 }
@@ -475,7 +520,7 @@ async function startVoice(v){
     await lkRoom.connect(v.url,v.token);await lkRoom.localParticipant.setMicrophoneEnabled(true);micOn=true;voiceUI('Mic on',true);
   }catch(e){lkRoom=null;toast('Voice failed: '+(e.message||e))}
 }
-setInterval(()=>{if(S&&S.phase!=='lobby'&&!$('#game').hidden)game()},1000);
+setInterval(()=>{if(S&&S.phase!=='lobby'&&!$('#game').hidden&&!document.hidden)game()},1000);
 
 // ---------- preview mode: /?preview shows every screen with sample data, no server or GPS needed ----------
 const PREVIEW=/[?&]preview\b/.test(location.search);

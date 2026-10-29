@@ -4,7 +4,7 @@ const PORT = process.env.PORT || 3000; let fails = 0;
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 function bot() { return new Promise(res => { const ws = new WebSocket('ws://localhost:' + PORT), b = { ws, msgs: [], state: null, id: null };
-  ws.on('message', d => { const m = JSON.parse(d); b.msgs.push(m); if (m.t === 'state') b.state = m; if (m.t === 'joined') { b.id = m.id; b.code = m.code; } });
+  ws.on('message', d => { const m = JSON.parse(d); b.msgs.push(m); if (m.t === 'state') { if (!m.cfg && b.state) m.cfg = b.state.cfg; b.state = m; } if (m.t === 'joined') { b.id = m.id; b.code = m.code; } });
   ws.on('open', () => res(b)); b.send = o => ws.send(JSON.stringify(o)); }); }
 const get = p => new Promise(r => http.get('http://localhost:' + PORT + p, x => { let n = 0; x.on('data', c => n += c.length); x.on('end', () => r({ s: x.statusCode, type: x.headers['content-type'], n })); }));
 (async () => {
