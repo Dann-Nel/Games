@@ -6,14 +6,14 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Scurry">
-<meta name="theme-color" content="#14213d">
+<meta name="theme-color" content="#000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
 <title>Scurry Live</title>
 <style>
-:root{--bg:#14213d;--card:#1f3157;--ink:#fff;--mut:#9fb0d0;--acc:#fca311;--bad:#e5383b;--ok:#2ec4b6;--inp:#0e1830;--line:#2a4073;--btn2:#2a4073}
+:root{--bg:#000;--card:#1c1c1e;--ink:#fff;--mut:#98989f;--acc:#fca311;--bad:#e5383b;--ok:#2ec4b6;--inp:#2c2c2e;--line:#3a3a3c;--btn2:#2c2c2e}
 body.light{--bg:#f3efe8;--card:#fff;--ink:#1b1d24;--mut:#6a6f7c;--inp:#ece7de;--line:#e1dbd0;--btn2:#e4ded3}
 *{box-sizing:border-box}html,body{height:100%;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 button,.lbl{-webkit-user-select:none;user-select:none;touch-action:manipulation}
@@ -27,23 +27,23 @@ h1{margin:6px 0}.s{color:var(--mut);margin:0 0 14px}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
 label{display:block;margin:8px 0 3px;color:var(--mut);font-size:13px}
 input{width:100%;padding:11px;border-radius:9px;border:0;font-size:16px;background:var(--inp);color:var(--ink)}
-button{width:100%;padding:13px;border:0;border-radius:11px;font-size:16px;font-weight:700;background:var(--acc);color:#14213d;margin-top:8px}
+button{width:100%;padding:13px;border:0;border-radius:11px;font-size:16px;font-weight:700;background:var(--acc);color:#000;margin-top:8px}
 button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);color:#fff}button.on{outline:3px solid var(--ok)}
 .seg{display:flex;gap:6px}.seg button{margin:0;padding:11px 4px;font-size:15px}
 .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #game{position:fixed;inset:0;display:none}
 #map{position:absolute;inset:0}
-#hud{position:absolute;left:0;right:0;top:0;z-index:500;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:linear-gradient(#14213dee,#14213d00);pointer-events:none}
+#hud{position:absolute;left:0;right:0;top:0;z-index:500;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:linear-gradient(#000ee,#00000);pointer-events:none}
 #hud .a{display:flex;justify-content:space-between;font-weight:800;font-size:15px}
 #hud .b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
 #hud .c{font-size:13px;color:#ffe9b8}
-#bar{position:absolute;left:0;right:0;bottom:0;z-index:500;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-wrap:wrap;gap:8px;background:#14213dd9}
+#bar{position:absolute;left:0;right:0;bottom:0;z-index:500;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-wrap:wrap;gap:8px;background:#000d9}
 #bar button{margin:0;padding:12px 4px;font-size:15px;flex:1 1 30%}
 #bar #bcaught{flex:1 1 100%;order:-1;padding:16px 4px;font-size:18px}
 #hostp{position:absolute;left:0;right:0;bottom:0;z-index:700;height:70%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #hl{flex:1;overflow:auto}
-#toast{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:600;background:var(--acc);color:#14213d;font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
+#toast{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:600;background:var(--acc);color:#000;font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
 #chat{position:absolute;left:0;right:0;bottom:0;z-index:700;height:55%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #msgs{flex:1;overflow:auto;font-size:15px}#msgs b{color:var(--acc)}
 #cin{display:flex;gap:6px}#cin button{width:90px;margin:0}
@@ -264,8 +264,8 @@ function initMap(){
   L_.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
   layers={cur:L_.circle([0,0],{radius:1,color:'#e5383b',weight:3,fillColor:'#e5383b',fillOpacity:.05}).addTo(map),
     next:L_.circle([0,0],{radius:1,color:'#fff',weight:2,dashArray:'8 8',fill:false}).addTo(map),
-    meAcc:L_.circle([0,0],{radius:1,color:'#1d6bff',weight:1,fillOpacity:.12,interactive:false}).addTo(map),
-    me:L_.circleMarker([0,0],{radius:8,color:'#fff',fillColor:'#1d6bff',fillOpacity:1,weight:3}).addTo(map),
+    meAcc:L_.circle([0,0],{radius:1,color:'#ff2d2d',weight:1,fillOpacity:.12,interactive:false}).addTo(map),
+    me:L_.circleMarker([0,0],{radius:8,color:'#fff',fillColor:'#ff2d2d',fillOpacity:1,weight:3}).addTo(map),
     mk:L_.layerGroup().addTo(map),fx:L_.layerGroup().addTo(map)};
   map.invalidateSize();
   layers.cur.setLatLng([S.center.lat,S.center.lng]).setRadius(S.cfg.radius);
