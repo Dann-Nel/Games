@@ -12,7 +12,7 @@ const fileCache = new Map();   // path -> { mtime, raw, gz }: static files are g
 // ---------- static files ----------
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.svg': 'image/svg+xml',
   '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.png': 'image/png' };
-const server = http.createServer((req, res) => {
+const handler = (req, res) => {
   let p;
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch { res.writeHead(400); return res.end('bad request'); }
   if (p.includes('\0')) { res.writeHead(400); return res.end('bad request'); }
@@ -36,8 +36,11 @@ const server = http.createServer((req, res) => {
       fileCache.set(f, c); send(c);
     });
   });
-});
-const wss = new WebSocketServer({ server, maxPayload: 8 * 1024 });
+};
+const server = http.createServer(handler);
+const wss = new WebSocketServer({ noServer: true, maxPayload: 8 * 1024 });
+const attachWs = srv => srv.on('upgrade', (req, sock, head) => wss.handleUpgrade(req, sock, head, ws => wss.emit('connection', ws, req)));
+attachWs(server);
 
 // ---------- helpers ----------
 const clamp = (v, lo, hi, d) => { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
@@ -582,3 +585,11 @@ function handle(ws, m) {
 }
 
 server.listen(PORT, () => console.log(`Scurry Live on http://localhost:${PORT}`));
+// Fly.io: the platform's internal port is set in the dashboard form and in fly.toml, and a mismatch makes every health check fail.
+// So on Fly only, also answer on the two usual ports; extra listeners are harmless.
+if (process.env.FLY_APP_NAME) for (const p of [3000, 8080]) {
+  if (String(p) === String(PORT)) continue;
+  const extra = http.createServer(handler); attachWs(extra);
+  extra.on('error', e => console.error(`extra port ${p}:`, e.message));
+  extra.listen(p, () => console.log(`also listening on ${p}`));
+}
