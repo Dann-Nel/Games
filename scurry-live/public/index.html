@@ -187,8 +187,20 @@ function beep(f){try{audioCtx=audioCtx||new AudioContext();const o=audioCtx.crea
 function alertUser(k){beep({ping:740,hunt:1000,warn:300,out:400,over:520}[k]||800);navigator.vibrate&&navigator.vibrate([200,100,200]);document.body.classList.add('flash');setTimeout(()=>document.body.classList.remove('flash'),400);}
 
 // ---------- geolocation ----------
+// Inside the native Scurry app, location comes from a background-capable plugin (foreground service on Android), so tracking survives a locked screen.
+const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const BG=NATIVE&&Capacitor.registerPlugin?Capacitor.registerPlugin('BackgroundGeolocation'):null;
 function watchGPS(){
-  if(watchGPS.id||!navigator.geolocation)return;
+  if(watchGPS.id)return;
+  if(BG){
+    watchGPS.id='pending';
+    BG.addWatcher({backgroundTitle:'Scurry is running',backgroundMessage:'Sharing your location with your game. Tap to return.',requestPermissions:true,stale:false,distanceFilter:0},(loc,err)=>{
+      if(err){if(err.code==='NOT_AUTHORIZED'){toast('Location is blocked. Allow it in Settings to play.');BG.openSettings&&BG.openSettings()}return}
+      if(!loc)return;myPos={lat:loc.latitude,lng:loc.longitude,acc:loc.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc});
+    }).then(id=>{if(watchGPS.id==='pending')watchGPS.id=id;else BG.removeWatcher({id})}).catch(e=>{watchGPS.id=null;toast('GPS error: '+(e.message||e))});
+    return;
+  }
+  if(!navigator.geolocation)return;
   const low=!!watchGPS.low;
   watchGPS.id=navigator.geolocation.watchPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc});},
     e=>{
@@ -197,16 +209,16 @@ function watchGPS(){
     },low?{enableHighAccuracy:false,maximumAge:10000,timeout:30000}:{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
 // The server asks for this a few seconds before every ping so the revealed dot is as fresh and precise as possible.
-function freshFix(){if(!navigator.geolocation)return;
+function freshFix(){if(BG||!navigator.geolocation)return;
   navigator.geolocation.getCurrentPosition(p=>{myPos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};send({t:'loc',lat:myPos.lat,lng:myPos.lng,acc:myPos.acc})},()=>{},{enableHighAccuracy:true,maximumAge:3000,timeout:6000})}
-function stopGPS(){if(watchGPS.id){navigator.geolocation.clearWatch(watchGPS.id);watchGPS.id=null}myPos=null}
-async function keepAwake(){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
+function stopGPS(){const id=watchGPS.id;watchGPS.id=null;if(id){if(BG){if(id!=='pending')BG.removeWatcher({id})}else navigator.geolocation.clearWatch(id)}myPos=null}
+async function keepAwake(){if(NATIVE)return;try{wake=await navigator.wakeLock.request('screen')}catch(e){}}   // the native app tracks with the screen off, so it need not hold the screen on
 let hiddenAt=0;
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){hiddenAt=Date.now();return}
   if(!PREVIEW&&(!ws||ws.readyState>1))connect();
   if(S&&S.phase!=='lobby'){keepAwake();freshFix();
-    if(S.phase!=='over'&&hiddenAt&&Date.now()-hiddenAt>8000){const b=$('#bg');b.style.display='block';setTimeout(()=>b.style.display='none',6000)}}
+    if(!NATIVE&&S.phase!=='over'&&hiddenAt&&Date.now()-hiddenAt>8000){const b=$('#bg');b.style.display='block';setTimeout(()=>b.style.display='none',6000)}}
   hiddenAt=0;
 });
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -474,6 +486,7 @@ function moreSheet(open){
   if(y.role==='runner'&&!y.out&&S.phase!=='over')b+=`<div class="card"><label style="margin:0">Backup code</label><div class="big">${esc(y.tagCode||'')}</div><p class="s" style="margin:4px 0 0">Only if a hunter tagged you and the app did not register it: tell them this code. Normally just use the red button.</p></div>`;
   if(y.role==='hunter'&&S.phase==='hunt')b+='<button class="g" id="mcode">Enter a runner\'s code</button>';
   if(S.host)b+='<button class="g" id="mhost">Host controls</button>';
+  b+=NATIVE?'<p class="s" style="margin:0 0 8px">Scurry app: your location keeps updating when the screen is locked.</p>':'<p class="s" style="margin:0 0 8px">In the browser, keep Scurry open with the screen on. The Scurry app keeps tracking when the screen is locked.</p>';
   b+=`<div class="h3">Theme</div>${themePicker()}<div class="set" style="margin-top:8px"><span>Smooth mode<small>Easier on battery and older phones. Turn off for a fancier dark map.</small></span><button class="sw ${isLite()?'on':''}" id="mlite" aria-label="Smooth mode"></button></div><button class="g" id="mclose">Close</button>`;
   $('#mbody').innerHTML=b;wireThemes();
   $('#mclose').onclick=()=>{el.style.display='none'};

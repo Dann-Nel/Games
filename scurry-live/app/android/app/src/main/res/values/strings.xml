@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Scurry</string>
+    <string name="title_activity_main">Scurry</string>
+    <string name="package_name">live.scurry.app</string>
+    <string name="custom_url_scheme">live.scurry.app</string>
+</resources>

@@ -1,0 +1,41 @@
+# Builds the Scurry Android app (an APK you can install directly) in GitHub's cloud: no Android Studio needed.
+# One-time setup: repo Settings -> Secrets and variables -> Actions -> Variables -> New variable
+#   SCURRY_URL = https://your-game.onrender.com
+# Then run it: Actions tab -> "Build Android APK" -> Run workflow, and download the artifact "scurry-android".
+name: Build Android APK
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Game URL (overrides the SCURRY_URL variable)'
+        required: false
+  push:
+    branches: [claude/scurry-live]
+    paths: ['scurry-live/app/**', '.github/workflows/android-apk.yml']
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scurry-live/app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: scurry-live/app/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Resolve game URL
+        env: { INPUT_URL: '${{ inputs.url }}', VAR_URL: '${{ vars.SCURRY_URL }}' }
+        run: |
+          URL="${INPUT_URL:-$VAR_URL}"
+          if [ -z "$URL" ]; then echo "::error::Set the SCURRY_URL repository variable (or pass a url) to your game's https address."; exit 1; fi
+          case "$URL" in https://*) ;; *) echo "::error::The game URL must start with https://"; exit 1;; esac
+          echo "SCURRY_URL=$URL" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: npx cap sync android
+      - run: ./gradlew assembleDebug --no-daemon
+        working-directory: scurry-live/app/android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scurry-android
+          path: scurry-live/app/android/app/build/outputs/apk/debug/app-debug.apk

@@ -74,3 +74,10 @@ Measured with 70 bots and a 4x-throttled phone CPU (before -> after):
 - Connection: "Reconnecting..." banner, exponential backoff, instant reconnect when the app returns to the foreground or the network comes back. Service worker caches map tiles and the Leaflet/LiveKit libraries.
 - Clients must treat `cfg` as optional in `state` messages and compute clock skew on arrival (`m.skew`).
 - Deploy: render.yaml now sets region: frankfurt. Render free instances sleep after ~15 min idle (30-60 s cold start): ping /healthz every 5 min with a free uptime monitor before an event.
+
+## Update (native Android app)
+- `scurry-live/app/`: Capacitor 7 shell (appId live.scurry.app) that loads SCURRY_URL, with @capacitor-community/background-geolocation (Android foreground service of type location). Built and verified here (debug APK ~5 MB; manifest has FINE/COARSE location, FOREGROUND_SERVICE(+_LOCATION), POST_NOTIFICATIONS). Kept in its own folder so Render's server install stays light.
+- Web client: `NATIVE`/`BG` in index.html use the plugin when `window.Capacitor` is native; browser path unchanged. Native skips the screen wake lock and the "was in background" banner. Verified with a mocked plugin (locations reach the server; removeWatcher on stop).
+- CI: `.github/workflows/android-apk.yml` builds the APK in GitHub Actions (needs repo variable SCURRY_URL). README in app/ explains install steps.
+- NOT verified: behaviour on a real phone with the screen locked (WebView JS + WebSocket staying alive in background is the open risk), Play Store release, iOS (needs Mac + Apple account).
+- Sandbox note: repo.maven.apache.org returned 429 here; local builds used a Google mirror via ~/.gradle/init.d/mirror.gradle (not committed; CI uses normal Maven Central).
