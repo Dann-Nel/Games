@@ -63,8 +63,12 @@ function makeCfg(inp = {}) {
     huntSecs: clamp(inp.huntSecs, 10, 7200, 1800),          // runners win if they last this long
     outsideGrace: clamp(inp.outsideGrace, 0, 600, 30),      // seconds outside the zone before elimination (0 = never)
     tagRange: clamp(inp.tagRange, 5, 200, 25),              // metres within which a tag counts
-    caughtJoinHunters: inp.caughtJoinHunters !== false,
+    taggedMode: inp.taggedMode === 'watch' || (inp.taggedMode === undefined && inp.caughtJoinHunters === false) ? 'watch' : 'hunter',  // what a tagged runner becomes
+    zoneOn: inp.zoneOn !== false,                           // false = no play zone: no shrinking, no outside-zone exposure
+    huntersTalk: inp.huntersTalk !== false,                 // hunters may use team chat and voice
+    watchDelay: clamp(inp.watchDelay, 0, 300, 60),          // seconds behind live that tagged spectators see the game
     teamChat: inp.teamChat !== false,
+    get caughtJoinHunters() { return this.taggedMode === 'hunter'; },
     voice: inp.voice !== false,
     pingRevealsHunters: !!inp.pingRevealsHunters,
     safeSecs: clamp(inp.safeSecs, 0, 600, 60),              // total seconds each runner may shelter in safe spots
@@ -98,7 +102,7 @@ function addPlayer(g, name, ws) {
     loc: null, locT: 0, lastPing: null, tagCode: null, outsideSince: null, exposed: false, lastChat: 0,
     item: null, safe: false, safeUsed: 0, decoyNext: false, ghostNext: false,
     muted: false, badFixes: 0, lowAcc: 0, flags: 0, staleWarned: false, lastSos: 0, acc: null,
-    lastFixT: 0, lastTag: 0, tagFails: 0, tagLockUntil: 0, cid: null };
+    lastFixT: 0, ready: false, hist: [], lastTag: 0, tagFails: 0, tagLockUntil: 0, cid: null };
   g.players.set(p.id, p);
   return p;
 }
@@ -159,7 +163,7 @@ function event(g, text, kind) {
 }
 function eliminate(g, p, why) {
   p.out = true; p.exposed = false; p.outsideSince = null;
-  p.role = g.cfg.caughtJoinHunters ? 'hunter' : 'spectator';
+  p.role = g.cfg.taggedMode === 'hunter' ? 'hunter' : 'spectator';
   p.tagCode = null; p.item = null; p.safe = false; p.decoyNext = false; p.ghostNext = false;
   event(g, `${p.name} is out (${why}).`, 'out');
 }
@@ -187,7 +191,7 @@ function finish(g, winner) {
 }
 // Privacy: location data is deleted the moment a game ends (and again on rematch).
 function wipeLocations(g) {
-  for (const p of g.players.values()) { p.loc = null; p.locT = 0; p.acc = null; p.lastPing = null; p.exposed = false; p.outsideSince = null; }
+  for (const p of g.players.values()) { p.loc = null; p.locT = 0; p.acc = null; p.hist = []; p.lastPing = null; p.exposed = false; p.outsideSince = null; }
   g.drops = [];
 }
 
@@ -213,7 +217,7 @@ function tick(g) {
     for (const p of active(g, 'runner')) {
       const inSpot = p.loc && g.spots.some(s => dist(p.loc, s) <= g.cfg.safeRadius);
       if (inSpot && p.safeUsed < g.cfg.safeSecs * 1000) { p.safeUsed += 1000; p.safe = true; } else p.safe = false;
-      const out =p.loc && dist(p.loc, z.cur) > z.cur.r;
+      const out = g.cfg.zoneOn && p.loc && dist(p.loc, z.cur) > z.cur.r;
       if (out) {
         if (!p.outsideSince) { p.outsideSince = now; send(p.ws, { t: 'event', kind: 'warn', text: 'You are outside the zone: hunters can see you!' }); }
         p.exposed = true;
@@ -271,7 +275,7 @@ function view(g, p, now) {
   if (g.host === p.id) v.roster = [...g.players.values()].map(q => ({ id: q.id, name: q.name, muted: q.muted, online: !!q.ws, stale: staleAge(g, q, now), flags: q.flags, reports: g.reports.filter(r => r.about === q.id).length }));
   if (g.host === p.id) v.reports = g.reports.slice(-30);
   if (g.phase === 'lobby') {
-    v.players = [...g.players.values()].map(q => ({ id: q.id, name: q.name, pref: q.pref, online: !!q.ws }));
+    v.players = [...g.players.values()].map(q => ({ id: q.id, name: q.name, pref: q.pref, online: !!q.ws, ready: q.ready || q.id === g.host, host: q.id === g.host }));
     return v;
   }
   v.counts = { runners: active(g, 'runner').length, hunters: active(g, 'hunter').length, total: g.players.size };
@@ -280,6 +284,15 @@ function view(g, p, now) {
   v.zone = zoneAt(g, now);
   const m = [];
   const hunterSide = p.role === 'hunter';
+  if (p.role === 'spectator') {                               // tagged "watch" mode: everyone, but only as they were watchDelay seconds ago
+    const at = now - g.cfg.watchDelay * 1000;
+    for (const q of g.players.values()) {
+      if (q.id === p.id || (q.role !== 'runner' && q.role !== 'hunter') || q.out && q.role !== 'hunter') continue;
+      let h = null; for (let i = q.hist.length - 1; i >= 0; i--) if (q.hist[i].t <= at) { h = q.hist[i]; break; }
+      if (h) m.push({ id: q.id, name: q.name, kind: 'watch', role: q.role, lat: h.lat, lng: h.lng, t: h.t, acc: h.acc });
+    }
+    v.markers = m; return v;
+  }
   for (const q of g.players.values()) {
     if (q.id === p.id) continue;
     const base = { id: q.id, name: q.name };
@@ -382,6 +395,15 @@ function handle(ws, m) {
     case 'pref':
       if (g.phase === 'lobby' && ['runner', 'hunter', 'random'].includes(m.pref)) p.pref = m.pref;
       break;
+    case 'ready':
+      if (g.phase === 'lobby') p.ready = !!m.on;
+      break;
+    case 'newcode': {      // host swaps the match code (e.g. after it leaked); everyone in the lobby is moved over
+      if (g.host !== p.id || g.phase !== 'lobby') return;
+      games.delete(g.code); g.code = newCode(); games.set(g.code, g);
+      for (const q of g.players.values()) if (q.ws) { q.ws.gcode = g.code; send(q.ws, { t: 'joined', code: g.code, token: q.token, id: q.id }); }
+      break;
+    }
     case 'config':
       if (g.host === p.id && g.phase === 'lobby') g.cfg = makeCfg(m.cfg);
       break;
@@ -402,7 +424,7 @@ function handle(ws, m) {
     case 'rematch':
       if (g.host === p.id && g.phase === 'over') {
         g.phase = 'lobby'; g.winner = null; wipeLocations(g);
-        for (const q of g.players.values()) { q.role = null; q.out = false; q.lastPing = null; q.exposed = false; q.tagCode = null; }
+        for (const q of g.players.values()) { q.role = null; q.out = false; q.ready = false; q.lastPing = null; q.exposed = false; q.tagCode = null; }
       }
       break;
     case 'loc': {
@@ -423,7 +445,9 @@ function handle(ws, m) {
         }
       }
       p.badFixes = 0;
-      p.loc = { lat: m.lat, lng: m.lng }; p.locT = now; p.acc = typeof m.acc === 'number' ? Math.round(m.acc) : null; break;
+      p.loc = { lat: m.lat, lng: m.lng }; p.locT = now; p.acc = typeof m.acc === 'number' ? Math.round(m.acc) : null;
+      p.hist.push({ lat: m.lat, lng: m.lng, t: now, acc: p.acc }); while (p.hist.length && now - p.hist[0].t > 330000) p.hist.shift();   // kept only for the delayed spectator view
+      break;
     }
     case 'sos': {
       const now = Date.now();
@@ -512,6 +536,7 @@ function handle(ws, m) {
       if (!g.cfg.teamChat || g.phase === 'lobby') return;
       const ch = chanFor(p); const text = String(m.text || '').trim().slice(0, 200);
       if (!ch || !text) return;
+      if (p.role === 'hunter' && !g.cfg.huntersTalk) return err('Hunter chat is turned off.');
       if (p.muted) return err('You are muted by the host.');
       const now = Date.now(); if (now - p.lastChat < 700) return; p.lastChat = now;
       const msg = { t: 'chat', ch, from: p.name, fid: p.id, text, at: now };
@@ -521,7 +546,7 @@ function handle(ws, m) {
     }
     case 'voice': {
       const ch = chanFor(p);
-      if (!g.cfg.voice || !ch || g.phase === 'lobby') return err('Voice is not available.');
+      if (!g.cfg.voice || !ch || g.phase === 'lobby' || (p.role === 'hunter' && !g.cfg.huntersTalk)) return err('Voice is not available.');
       const room = `scurry-${g.code}-${ch}`;
       const token = livekitToken(room, p.id, p.name, p.muted);
       if (!token) return err('Voice server is not configured (set LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET).');

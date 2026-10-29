@@ -44,3 +44,8 @@ tag-code oracle/brute force, burst teleport bypass, malformed-URL crash, name XS
 - Background warning: if the app was hidden >8 s the player sees a banner and a fresh GPS fix is requested.
 - Deploy: root `render.yaml` (Render blueprint, free tier gives HTTPS). Free tier sleeps when idle and wipes games on restart.
 - Phones: Android Chrome menu -> Install app. iPhone Safari Share -> Add to Home Screen. Both must keep the app open with the screen on.
+
+## Update (lobby pass, modelled on the lobby screenshots the user shared)
+- Lobby rebuilt: minute steppers (round length, pings, head start, zone size, shrink interval), toggles (hunters can talk, play zone), "when tagged" = join hunters or Watch (spectate N s behind, default 60), Copy/Change game code, Hosting badge, Ready status per player, Invite friends, Light/Dark appearance, summary line for the shrink schedule. Old numeric fields live under "Advanced rules".
+- Server: cfg.taggedMode ('hunter'|'watch'), watchDelay, zoneOn, huntersTalk; messages `ready`, `newcode`. Spectators only receive delayed positions (per-player history kept 5.5 min, wiped at game end).
+- sim5.js covers these. All of sim, sim2-sim5 pass.

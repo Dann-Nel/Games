@@ -13,7 +13,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
 <title>Scurry Live</title>
 <style>
-:root{--bg:#14213d;--card:#1f3157;--ink:#fff;--mut:#9fb0d0;--acc:#fca311;--bad:#e5383b;--ok:#2ec4b6}
+:root{--bg:#14213d;--card:#1f3157;--ink:#fff;--mut:#9fb0d0;--acc:#fca311;--bad:#e5383b;--ok:#2ec4b6;--inp:#0e1830;--line:#2a4073;--btn2:#2a4073}
+body.light{--bg:#f3efe8;--card:#fff;--ink:#1b1d24;--mut:#6a6f7c;--inp:#ece7de;--line:#e1dbd0;--btn2:#e4ded3}
 *{box-sizing:border-box}html,body{height:100%;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 button,.lbl{-webkit-user-select:none;user-select:none;touch-action:manipulation}
 #game{height:100vh;height:100dvh}
@@ -25,11 +26,11 @@ body.flash{background:var(--bad)}
 h1{margin:6px 0}.s{color:var(--mut);margin:0 0 14px}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
 label{display:block;margin:8px 0 3px;color:var(--mut);font-size:13px}
-input{width:100%;padding:11px;border-radius:9px;border:0;font-size:16px;background:#0e1830;color:var(--ink)}
+input{width:100%;padding:11px;border-radius:9px;border:0;font-size:16px;background:var(--inp);color:var(--ink)}
 button{width:100%;padding:13px;border:0;border-radius:11px;font-size:16px;font-weight:700;background:var(--acc);color:#14213d;margin-top:8px}
-button.g{background:#2a4073;color:var(--ink)}button.d{background:var(--bad);color:#fff}button.on{outline:3px solid var(--ok)}
+button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);color:#fff}button.on{outline:3px solid var(--ok)}
 .seg{display:flex;gap:6px}.seg button{margin:0;padding:11px 4px;font-size:15px}
-.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a4073;font-size:15px}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #game{position:fixed;inset:0;display:none}
 #map{position:absolute;inset:0}
@@ -47,6 +48,23 @@ button.g{background:#2a4073;color:var(--ink)}button.d{background:var(--bad);colo
 #msgs{flex:1;overflow:auto;font-size:15px}#msgs b{color:var(--acc)}
 #cin{display:flex;gap:6px}#cin button{width:90px;margin:0}
 .mk{border-radius:50%;border:2px solid #fff;width:14px;height:14px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.top b{font-size:18px}
+.top button{width:auto;margin:0;background:none;color:var(--acc);padding:6px 4px}
+.big{font-size:40px;font-weight:900;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;background:var(--bad);color:#fff;font-size:12px;padding:3px 10px;border-radius:99px;font-weight:700}
+.lk{width:auto!important;margin:0!important;background:none!important;color:var(--acc)!important;padding:4px 6px!important}
+.set{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:16px}
+.set:last-child{border-bottom:0}.set small{display:block;color:var(--mut);font-size:12px}
+.set .v{display:flex;align-items:center;gap:8px;color:var(--mut);white-space:nowrap}
+.step{display:flex;background:var(--btn2);border-radius:9px;overflow:hidden}
+.step button{width:44px;margin:0;padding:8px 0;background:none;color:var(--ink);font-size:20px;border-radius:0}
+.step button:first-child{border-right:1px solid var(--line)}
+.sw{width:50px;height:30px;border-radius:99px;background:var(--btn2);position:relative;padding:0;margin:0}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s}
+.sw.on{background:var(--bad);outline:0}.sw.on::after{left:23px}
+.h3{margin:16px 4px 6px;color:var(--mut);font-size:13px;text-transform:uppercase;letter-spacing:.05em}
+.rdy{color:var(--acc);font-weight:700}.nrdy{color:var(--mut)}
+details summary{cursor:pointer;color:var(--mut);padding:6px 0}
 .lbl{background:#000a;color:#fff;border:0;border-radius:4px;font-size:11px;padding:1px 4px}
 </style></head><body>
 <div id="home" class="pg"></div>
@@ -137,24 +155,55 @@ function home(){
   $('#jn').onclick=()=>{const n=nm();if(!n)return;watchGPS();send({t:'join',code:$('#cd').value.trim(),name:n,consent:true,cid});};
 }
 let lobbyMap;
+const dur=s=>s<60?s+' s':(Math.round(s/6)/10)+' min';
+const PINGS=[30,60,90,120,180,300,600];
+const STEPS={huntSecs:[600,7200,300],hideSecs:[60,1800,60],radius:[50,5000,50],hold:[60,1800,60]};
+function bump(key,dir){
+  const c={...S.cfg};
+  if(key==='pingEvery'){let i=PINGS.reduce((b,v,j)=>Math.abs(v-c.pingEvery)<Math.abs(PINGS[b]-c.pingEvery)?j:b,0);c.pingEvery=PINGS[Math.min(PINGS.length-1,Math.max(0,i+dir))]}
+  else{const[lo,hi,st]=STEPS[key];c[key]=Math.min(hi,Math.max(lo,c[key]+dir*st))}
+  send({t:'config',cfg:c});
+}
+function toggleCfg(key,val){send({t:'config',cfg:{...S.cfg,[key]:val}})}
+function setTheme(t){store.set('sc_theme',t);document.body.classList.toggle('light',t==='light')}
+setTheme(store.get('sc_theme')||'dark');
 function lobby(){
   watchGPS();
-  const sig=JSON.stringify([S.players,S.cfg,S.you.pref,S.host,S.center,S.spots]);
+  const sig=JSON.stringify([S.players,S.cfg,S.you.pref,S.host,S.center,S.spots,store.get('sc_theme')]);
   if($('#home').dataset.mode==='lobby'&&(sig===lobby.sig||$('#home').contains(document.activeElement)&&document.activeElement.tagName==='INPUT'))return;
   lobby.sig=sig;$('#home').dataset.mode='lobby';
   if(lobbyMap){lobbyMap.remove();lobbyMap=null}
-  const c=S.cfg,counts={runner:0,hunter:0,random:0};S.players.forEach(p=>counts[p.pref]++);
-  const field=(k,l,v)=>`<div><label>${l}</label><input data-k="${k}" type="number" step="any" value="${v}" ${S.host?'':'disabled'}></div>`;
-  $('#home').innerHTML=`<h1>Game ${S.code}</h1><p class="s">${S.players.length}/70 players. Share the code.</p>
-  <div class="card"><label>I want to be</label><div class="seg">${['runner','hunter','random'].map(r=>`<button class="g ${S.you.pref===r?'on':''}" data-pref="${r}">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
-  <p class="s" style="margin:8px 0 0">Choices: ${counts.runner} runner, ${counts.hunter} hunter, ${counts.random} random. Hunters are picked from hunter and random players.</p></div>
-  <div class="card"><b>Players</b>${S.players.map(p=>`<div class="row"><span>${esc(p.name)}${p.id===S.you.id?' (you)':''}${p.online?'':' ·offline'}</span><span>${p.pref}${S.host&&p.id!==S.you.id?` <button class="d" data-kick="${p.id}" style="width:auto;padding:4px 10px;margin:0">Kick</button>`:''}</span></div>`).join('')}</div>
-  ${S.host?`<div class="card"><b>Rules (host)</b><div class="grid">
-   ${field('hunterRatio','Hunter share (0.15 = 15%)',c.hunterRatio)}${field('hideSecs','Hide time (s)',c.hideSecs)}
-   ${field('radius','Zone radius (m)',c.radius)}${field('stages','Shrinks',c.stages)}
-   ${field('hold','Hold before shrink (s)',c.hold)}${field('shrink','Shrink duration (s)',c.shrink)}
-   ${field('pingEvery','Ping every (s)',c.pingEvery)}${field('huntSecs','Max game (s)',c.huntSecs)}
-   ${field('outsideGrace','Outside-zone limit (s)',c.outsideGrace)}${field('tagRange','Tag range (m)',c.tagRange)}
+  const c=S.cfg,H=S.host,counts={runner:0,hunter:0,random:0};S.players.forEach(p=>counts[p.pref]++);
+  const me_=S.players.find(p=>p.id===S.you.id)||{};
+  const n=S.players.length,hn=Math.max(1,Math.min(n-1,Math.round(n*c.hunterRatio)));
+  const stepper=(k,label,val,sub)=>`<div class="set"><span>${label}${sub?`<small>${sub}</small>`:''}</span><span class="v">${val}${H?`<span class="step"><button data-bump="${k}" data-d="-1">−</button><button data-bump="${k}" data-d="1">+</button></span>`:''}</span></div>`;
+  const toggle=(k,label,on,sub)=>`<div class="set"><span>${label}${sub?`<small>${sub}</small>`:''}</span><button class="sw ${on?'on':''}" data-tg="${k}" ${H?'':'disabled'} aria-label="${label}"></button></div>`;
+  const fin=Math.round(c.radius*Math.pow(c.stageFactor,c.stages));
+  const field=(k,l,v)=>`<div><label>${l}</label><input data-k="${k}" type="number" step="any" value="${v}" ${H?'':'disabled'}></div>`;
+  const notReady=S.players.filter(p=>!p.ready).length;
+  $('#home').innerHTML=`<div class="top"><button id="lv">‹ Back</button><b>Lobby</b><button id="shr">Share</button></div>
+  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><label style="margin:0">Game code</label><span><button class="lk" id="cpy">Copy</button>${H?'<button class="lk" id="chg">Change</button>':''}</span></div>
+   <div style="display:flex;justify-content:space-between;align-items:center"><span class="big">${S.code}</span>${H?'<span class="pill">Hosting</span>':''}</div></div>
+  <div class="h3">House rules${H?'':' (set by host)'}</div><div class="card">
+   ${stepper('huntSecs','Round length',dur(c.huntSecs))}
+   ${stepper('pingEvery','Pings','Every '+dur(c.pingEvery))}
+   ${stepper('hideSecs','Head start',dur(c.hideSecs))}
+   ${toggle('huntersTalk','Hunters can talk',c.huntersTalk)}
+   <div class="set"><span>When tagged<small>${c.taggedMode==='watch'?'Watch, '+dur(c.watchDelay)+' behind':'Join the hunters'}</small></span>${H?`<button class="sw ${c.taggedMode==='watch'?'on':''}" id="tgd" aria-label="When tagged"></button>`:''}</div>
+   ${toggle('zoneOn','Play zone',c.zoneOn)}
+   ${c.zoneOn?stepper('radius','Zone size',c.radius+' m · '+(S.center?'Map pin':'Around you')):''}
+   ${c.zoneOn?stepper('hold','Zone shrinks','Every '+dur(c.hold)):''}
+  </div>
+  <p class="s" style="margin:-4px 4px 12px">${c.zoneOn?`Shrinks every ${dur(c.hold)} after the head start: ${c.radius} m → ${fin} m, final size for the last ${dur(c.hold)}.`:'No play zone: the whole map is in bounds.'}</p>
+  <div class="h3">You play as</div><div class="card"><div class="seg">${['hunter','runner','random'].map(r=>`<button class="g ${S.you.pref===r?'on':''}" data-pref="${r}">${r[0].toUpperCase()+r.slice(1)}</button>`).join('')}</div>
+  <p class="s" style="margin:8px 0 0">With ${n} player${n===1?'':'s'}: ${hn} hunter${hn===1?'':'s'}. Random fills whichever team needs it. (${counts.hunter} want hunter, ${counts.runner} runner, ${counts.random} random.)</p></div>
+  <div class="h3">Players · ${n}/70</div><div class="card">${S.players.map(p=>`<div class="row"><span>${esc(p.name)}${p.id===S.you.id?' <small class="s">You</small>':''}${p.host?' <small class="s">· Host</small>':''}${p.online?'':' ·offline'}</span><span>${p.pref} · <span class="${p.ready?'rdy':'nrdy'}">${p.ready?'Ready':'Not ready'}</span>${H&&p.id!==S.you.id?` <button class="d" data-kick="${p.id}" style="width:auto;padding:4px 10px;margin:0 0 0 6px">Kick</button>`:''}</span></div>`).join('')||'<p class="s">Nobody here yet. Send your friends the link.</p>'}
+   ${H?'':`<button class="${me_.ready?'g':''}" id="rdy">${me_.ready?'Not ready':'I\'m ready'}</button>`}</div>
+  <div class="h3">Appearance</div><div class="card"><div class="seg"><button class="g ${document.body.classList.contains('light')?'on':''}" id="thl">Light</button><button class="g ${document.body.classList.contains('light')?'':'on'}" id="thd">Dark</button></div></div>
+  ${H?`<div class="card"><details ${lobby.open?'open':''}><summary>Advanced rules, map and safe spots</summary><div class="grid">
+   ${field('hunterRatio','Hunter share (0.15 = 15%)',c.hunterRatio)}${field('stages','Shrinks (count)',c.stages)}
+   ${field('shrink','Shrink duration (s)',c.shrink)}${field('outsideGrace','Outside-zone limit (s)',c.outsideGrace)}
+   ${field('tagRange','Tag range (m)',c.tagRange)}${field('watchDelay','Spectator delay (s)',c.watchDelay)}
    ${field('safeSecs','Safe-spot time per runner (s)',c.safeSecs)}${field('safeRadius','Safe-spot radius (m)',c.safeRadius)}
    ${field('bountyAt','Bounty when runners left ≤',c.bountyAt)}${field('bountyEvery','Bounty ping every (s)',c.bountyEvery)}
    ${field('dropEvery','Supply drop every (s)',c.dropEvery)}${field('radarRadius','Radar radius (m)',c.radarRadius)}
@@ -165,31 +214,43 @@ function lobby(){
    <label><input type="checkbox" data-b="drops" ${c.drops?'checked':''} style="width:auto"> Supply drops with power-ups</label>
    <label><input type="checkbox" data-b="teamChat" ${c.teamChat?'checked':''} style="width:auto"> Team chat</label>
    <label><input type="checkbox" data-b="voice" ${c.voice?'checked':''} style="width:auto"> Team voice</label>
-   <label><input type="checkbox" data-b="caughtJoinHunters" ${c.caughtJoinHunters?'checked':''} style="width:auto"> Caught runners become hunters</label>
    <label><input type="checkbox" data-b="pingRevealsHunters" ${c.pingRevealsHunters?'checked':''} style="width:auto"> Pings also reveal hunters to runners</label>
-   <p class="s" style="margin:8px 0 4px">Tap the map to set the zone centre (red) or add safe spots (green, ${S.spots.length}/10). Without a centre it uses your GPS.</p>
+   <p class="s" style="margin:8px 0 4px">Tap the map to set the zone centre (red) or add safe spots (green, ${S.spots.length}/10). Without a pin the zone is around you.</p>
    <div class="seg"><button class="g on" id="m1">Set zone centre</button><button class="g" id="m2">Add safe spot</button><button class="g" id="m3">Clear spots</button></div>
-   <div id="lmap" style="height:220px;border-radius:10px;margin-top:8px"></div>
-   <button id="go">Start game</button></div>`:'<p class="s">Waiting for the host to start...</p>'}
-  <button class="g" id="shr">Share join link</button><button class="g" id="lv">Leave</button>`;
-  $('#shr').onclick=async()=>{const u=location.origin+'/?code='+S.code;
-    try{if(navigator.share)await navigator.share({title:'Join my Scurry game',text:'Match code '+S.code,url:u});else{await navigator.clipboard.writeText(u);toast('Link copied')}}catch(e){}};
+   <div id="lmap" style="height:220px;border-radius:10px;margin-top:8px"></div></details></div>`:''}
+  <button class="g" id="inv">Invite friends</button>
+  ${H?'<button id="go">Start game'+(notReady>1?' ('+(notReady-1)+' not ready)':'')+'</button>':'<p class="s" style="text-align:center">Waiting for the host to start...</p>'}`;
+  const share=async()=>{const u=location.origin+'/?code='+S.code;
+    try{if(navigator.share)await navigator.share({title:'Join my Scurry game',text:'Match code '+S.code,url:u});else{await navigator.clipboard.writeText(u);toast('Link copied',true)}}catch(e){}};
+  $('#shr').onclick=share;$('#inv').onclick=share;
+  $('#cpy').onclick=async()=>{try{await navigator.clipboard.writeText(S.code);toast('Code copied',true)}catch(e){toast('Code: '+S.code,true)}};
+  if($('#chg'))$('#chg').onclick=()=>{if(confirm('Change the game code? Players already in stay in; the old code stops working.'))send({t:'newcode'})};
+  if($('#rdy'))$('#rdy').onclick=()=>send({t:'ready',on:!me_.ready});
+  $('#thl').onclick=()=>{setTheme('light');lobby.sig=null;lobby()};$('#thd').onclick=()=>{setTheme('dark');lobby.sig=null;lobby()};
   document.querySelectorAll('[data-pref]').forEach(b=>b.onclick=()=>send({t:'pref',pref:b.dataset.pref}));
   document.querySelectorAll('#home [data-kick]').forEach(b=>b.onclick=()=>{if(confirm('Remove this player?'))send({t:'kick',id:b.dataset.kick})});
   $('#lv').onclick=()=>{store.set('sc_token','');store.set('sc_code','');location.reload()};
-  if(S.host){
-    const push=()=>{const cfg={};document.querySelectorAll('[data-k]').forEach(i=>cfg[i.dataset.k]=+i.value);document.querySelectorAll('[data-b]').forEach(i=>cfg[i.dataset.b]=i.checked);send({t:'config',cfg})};
+  if(H){
+    document.querySelectorAll('[data-bump]').forEach(b=>b.onclick=()=>bump(b.dataset.bump,+b.dataset.d));
+    document.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>toggleCfg(b.dataset.tg,!S.cfg[b.dataset.tg]));
+    if($('#tgd'))$('#tgd').onclick=()=>toggleCfg('taggedMode',c.taggedMode==='watch'?'hunter':'watch');
+    const push=()=>{const cfg={...S.cfg};document.querySelectorAll('[data-k]').forEach(i=>cfg[i.dataset.k]=+i.value);document.querySelectorAll('[data-b]').forEach(i=>cfg[i.dataset.b]=i.checked);send({t:'config',cfg})};
     document.querySelectorAll('[data-k],[data-b]').forEach(i=>i.onchange=push);
-    $('#go').onclick=()=>{push();setTimeout(()=>send({t:'start'}),200)};
-    const at=S.center||myPos;
-    lobbyMap=L_.map('lmap').setView(at?[at.lat,at.lng]:[0,0],at?15:2);
-    L_.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(lobbyMap);
-    let circ=null;const draw=ll=>{if(circ)lobbyMap.removeLayer(circ);circ=L_.circle(ll,{radius:c.radius,color:'#e5383b',fillOpacity:.1}).addTo(lobbyMap)};
-    if(at)draw([at.lat,at.lng]);
-    S.spots.forEach(s=>L_.circle([s.lat,s.lng],{radius:c.safeRadius,color:'#2ec4b6',fillOpacity:.3}).addTo(lobbyMap));
-    let mode='center';const setM=m=>{mode=m;$('#m1').className='g'+(m==='center'?' on':'');$('#m2').className='g'+(m==='spot'?' on':'')};
-    $('#m1').onclick=()=>setM('center');$('#m2').onclick=()=>setM('spot');$('#m3').onclick=()=>send({t:'spots_clear'});
-    lobbyMap.on('click',e=>{if(mode==='center'){send({t:'center',lat:e.latlng.lat,lng:e.latlng.lng});draw(e.latlng)}else send({t:'spot',lat:e.latlng.lat,lng:e.latlng.lng})});
+    $('#go').onclick=()=>{if(notReady>1&&!confirm((notReady-1)+' player(s) are not ready. Start anyway?'))return;push();setTimeout(()=>send({t:'start'}),200)};
+    const det=document.querySelector('#home details');
+    const initMapOnce=()=>{if(lobbyMap)return;
+      const at=S.center||myPos;
+      lobbyMap=L_.map('lmap').setView(at?[at.lat,at.lng]:[0,0],at?15:2);
+      L_.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(lobbyMap);
+      let circ=null;const draw=ll=>{if(circ)lobbyMap.removeLayer(circ);circ=L_.circle(ll,{radius:c.radius,color:'#e5383b',fillOpacity:.1}).addTo(lobbyMap)};
+      if(at)draw([at.lat,at.lng]);
+      S.spots.forEach(s=>L_.circle([s.lat,s.lng],{radius:c.safeRadius,color:'#2ec4b6',fillOpacity:.3}).addTo(lobbyMap));
+      let mode='center';const setM=m=>{mode=m;$('#m1').className='g'+(m==='center'?' on':'');$('#m2').className='g'+(m==='spot'?' on':'')};
+      $('#m1').onclick=()=>setM('center');$('#m2').onclick=()=>setM('spot');$('#m3').onclick=()=>send({t:'spots_clear'});
+      lobbyMap.on('click',e=>{if(mode==='center'){send({t:'center',lat:e.latlng.lat,lng:e.latlng.lng});draw(e.latlng)}else send({t:'spot',lat:e.latlng.lat,lng:e.latlng.lng})});
+      setTimeout(()=>lobbyMap.invalidateSize(),50)};
+    det.addEventListener('toggle',()=>{lobby.open=det.open;if(det.open)initMapOnce()});
+    if(lobby.open)initMapOnce();
   }
 }
 
@@ -212,8 +273,8 @@ const fmt=ms=>{ms=Math.max(0,Math.ceil(ms/1000));return Math.floor(ms/60)+':'+St
 function game(){
   initMap();keepAwake();
   const z=S.zone,y=S.you,skew=S.now-Date.now(),now=Date.now()+skew;
-  layers.cur.setLatLng([z.cur.lat,z.cur.lng]).setRadius(z.cur.r);
-  if(z.next)layers.next.setLatLng([z.next.lat,z.next.lng]).setRadius(z.next.r).setStyle({opacity:1});else layers.next.setStyle({opacity:0});
+  layers.cur.setLatLng([z.cur.lat,z.cur.lng]).setRadius(z.cur.r).setStyle({opacity:S.cfg.zoneOn?1:0,fillOpacity:S.cfg.zoneOn?.05:0});
+  if(z.next&&S.cfg.zoneOn)layers.next.setLatLng([z.next.lat,z.next.lng]).setRadius(z.next.r).setStyle({opacity:1});else layers.next.setStyle({opacity:0});
   if(myPos){layers.me.setLatLng([myPos.lat,myPos.lng]);layers.meAcc.setLatLng([myPos.lat,myPos.lng]).setRadius(Math.max(myPos.acc||1,1));}
   layers.fx.clearLayers();
   for(const s of S.spots)L_.circle([s.lat,s.lng],{radius:S.cfg.safeRadius,color:'#2ec4b6',weight:2,dashArray:'4 4',fillOpacity:.25}).bindTooltip('Safe spot',{className:'lbl'}).addTo(layers.fx);
@@ -222,10 +283,10 @@ function game(){
   layers.mk.clearLayers();
   for(const m of S.markers){
     const age=Math.round((now-m.t)/1000);
-    const col={ally:'#2ec4b6',ping:'#fca311',exposed:'#e5383b'}[m.kind];
+    const col=m.kind==='watch'?(m.role==='hunter'?'#e5383b':'#2ec4b6'):{ally:'#2ec4b6',ping:'#fca311',exposed:'#e5383b'}[m.kind];
     if(m.acc>8)L_.circle([m.lat,m.lng],{radius:m.acc,color:col,weight:1,fillOpacity:.08,interactive:false}).addTo(layers.mk);  // accuracy ring
-    const c=L_.circleMarker([m.lat,m.lng],{radius:m.kind==='ally'?6:9,color:'#fff',weight:2,fillColor:col,fillOpacity:m.kind==='ping'?Math.max(.35,1-age/(S.cfg.pingEvery*2)):1}).addTo(layers.mk);
-    c.bindTooltip(m.kind==='ally'?esc(m.name):`${esc(m.name)} · ${m.kind==='ping'?'last ping '+age+'s ago':'EXPOSED live'}${m.acc?' ±'+m.acc+'m':''}`,{permanent:m.kind!=='ally',direction:'top',className:'lbl'});
+    const c=L_.circleMarker([m.lat,m.lng],{radius:m.kind==='ally'||m.kind==='watch'?6:9,color:'#fff',weight:2,fillColor:col,fillOpacity:m.kind==='ping'?Math.max(.35,1-age/(S.cfg.pingEvery*2)):1}).addTo(layers.mk);
+    c.bindTooltip(m.kind==='ally'||m.kind==='watch'?esc(m.name):`${esc(m.name)} · ${m.kind==='ping'?'last ping '+age+'s ago':'EXPOSED live'}${m.acc?' ±'+m.acc+'m':''}`,{permanent:m.kind!=='ally'&&m.kind!=='watch',direction:'top',className:'lbl'});
   }
   const role=y.out?(y.role==='hunter'?'HUNTER (caught)':'SPECTATOR'):y.role.toUpperCase();
   $('#hrole').textContent=role;$('#hcount').textContent=`${S.counts.runners} runners · ${S.counts.hunters} hunters`;
@@ -234,9 +295,10 @@ function game(){
   }else if(S.phase==='hide'){
     $('#hclock').textContent=fmt(S.huntStart-now);$('#hsub').textContent=y.role==='runner'?'Hide! Hunters are frozen.':'Hunters wait: runners are hiding.';
   }else{
-    $('#hclock').textContent=z.next?fmt(z.until-now):fmt(S.huntEnd-now);
-    let s=z.next?(z.shrinking?'Zone is shrinking now':`Zone shrinks in ${fmt(z.until-now)}`):'Final zone';
+    $('#hclock').textContent=z.next&&S.cfg.zoneOn?fmt(z.until-now):fmt(S.huntEnd-now);
+    let s=!S.cfg.zoneOn?'No play zone':z.next?(z.shrinking?'Zone is shrinking now':`Zone shrinks in ${fmt(z.until-now)}`):'Final zone';
     s+=` · next ping ${fmt(S.nextPingAt-now)}`;
+    if(y.role==='spectator')s=`Watching ${S.cfg.watchDelay}s behind live · next ping ${fmt(S.nextPingAt-now)}`;
     if(y.safe)s='SAFE SPOT: can\'t be tagged. Shelter left '+Math.round(y.safeLeft)+'s';
     if(y.outsideSince)s='OUTSIDE ZONE: hunters see you! Out in '+fmt(y.outsideSince+S.cfg.outsideGrace*1000-now);
     if(y.stale)s='NO GPS SIGNAL ('+y.stale+'s)! '+s;
