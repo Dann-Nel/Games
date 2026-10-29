@@ -50,11 +50,26 @@ button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);
 #hud .b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
 #hud .c{font-size:13px;color:var(--ink);opacity:.85}
 #bar{position:absolute;left:0;right:0;bottom:0;z-index:500;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-wrap:wrap;gap:8px;background:var(--bar)}
-#bar button{margin:0;padding:12px 4px;font-size:15px;flex:1 1 30%}
-#bar #bcaught{flex:1 1 100%;order:-1;padding:16px 4px;font-size:18px}
+#bar{flex-direction:column;gap:8px}
+#prim{display:flex;gap:8px}#prim button{margin:0;flex:1;padding:14px 6px;font-size:16px}
+#tools{display:flex;gap:8px;align-items:stretch}
+.t{position:relative;margin:0!important;flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px!important;font-size:11px!important;font-weight:700}
+.t svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.t.live{background:var(--acc);color:var(--acc-ink)}
+.t.dot::after{content:'';position:absolute;top:7px;right:calc(50% - 22px);width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 2px var(--bar)}
+.t.sos{flex:0 0 68px;background:var(--bad);color:#fff;margin-left:14px!important}
+#map .leaflet-bottom{bottom:var(--barh,100px)}
+#more{position:absolute;left:0;right:0;bottom:0;z-index:700;max-height:75%;background:var(--bg);display:none;flex-direction:column;padding:12px 12px calc(env(safe-area-inset-bottom) + 12px);border-top:2px solid var(--acc);overflow:auto}
+#more b.hd{font-size:18px;margin-bottom:8px}
+#dlg{position:fixed;inset:0;z-index:2000;background:#000a;display:flex;align-items:flex-end;justify-content:center;animation:fadein .15s}
+#dlg .sh{width:100%;max-width:520px;background:var(--card);color:var(--ink);border-radius:20px 20px 0 0;padding:20px 16px calc(env(safe-area-inset-bottom) + 16px);animation:up .18s ease-out}
+#dlg h2{margin:0 0 6px;font-size:20px}#dlg p{margin:0 0 12px;color:var(--mut)}
+#dlg input{font-size:28px;text-align:center;letter-spacing:.3em;margin-bottom:4px}
+@keyframes fadein{from{opacity:0}}@keyframes up{from{transform:translateY(40px);opacity:.6}}
+@media(min-width:600px){#dlg{align-items:center}#dlg .sh{border-radius:20px}}
 #hostp{position:absolute;left:0;right:0;bottom:0;z-index:700;height:70%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #hl{flex:1;overflow:auto}
-#toast{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:600;background:var(--acc);color:var(--acc-ink);font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
+#toast{position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:1500;background:var(--acc);color:var(--acc-ink);font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
 #chat{position:absolute;left:0;right:0;bottom:0;z-index:700;height:55%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #msgs{flex:1;overflow:auto;font-size:15px}#msgs b{color:var(--acc)}
 #cin{display:flex;gap:6px}#cin button{width:90px;margin:0}
@@ -79,14 +94,19 @@ details summary{cursor:pointer;color:var(--mut);padding:6px 0}
 .lbl{background:#000a;color:#fff;border:0;border-radius:4px;font-size:11px;padding:1px 4px}
 </style></head><body>
 <div id="home" class="pg"></div>
+<div id="toast"></div>
 
 <div id="game">
   <div id="map"></div>
   <div id="hud"><div class="a"><span id="hrole"></span><span id="hcount"></span></div><div class="b" id="hclock"></div><div class="c" id="hsub"></div></div>
-  <div id="toast"></div><div id="bg">Scurry was in the background, so your location stopped updating. Keep the app open with the screen on.</div>
+  <div id="bg">Scurry was in the background, so your location stopped updating. Keep the app open with the screen on.</div>
   <div id="chat"><div id="msgs"></div><div id="cin"><input id="ctext" maxlength="200" placeholder="Team message"><button id="csend">Send</button></div><button class="g" id="cclose">Close</button></div>
   <div id="hostp"><b>Host controls</b><p class="s" style="margin:4px 0 8px">Roles are hidden from you so hosting stays fair.</p><div id="hl"></div><button class="d" id="hend">End game now</button><button class="g" id="hclose">Close</button></div>
-  <div id="bar"><button class="g" id="bchat">Chat</button><button class="g" id="bvoice">Voice</button><button id="buse" style="display:none">Use</button><button class="d" id="bcaught">I've been tagged: I'm out</button><button class="d" id="bsos">SOS</button><button class="g" id="bhost" style="display:none">Host</button><button id="bact">Me</button></div>
+  <div id="bar">
+    <div id="prim"><button class="d" id="bcaught">I've been tagged</button><button id="buse" style="display:none">Use</button><button id="bover" style="display:none"></button></div>
+    <div id="tools"><button class="g t" id="bchat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5z"/></svg><span>Chat</span></button><button class="g t" id="bvoice"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>Voice</span></button><button class="g t" id="bmore"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>More</span></button><button class="t sos" id="bsos"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17v.5"/></svg><span>SOS</span></button></div>
+  </div>
+  <div id="more"><b class="hd">Menu</b><div id="mbody"></div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous"></script>
@@ -116,10 +136,38 @@ function onMsg(m){
   else if(m.t==='fix')freshFix();
   else if(m.t==='voice')startVoice(m);
   else if(m.t==='sos'){sosList.push(m);alertUser('warn');toast('SOS from '+m.name+(m.lat!=null?' (red marker on the map)':'')+'. Check on them!');}
-  else if(m.t==='kicked'){store.set('sc_token','');store.set('sc_code','');alert('You were removed from the game by the host.');location.reload();}
+  else if(m.t==='kicked'){store.set('sc_token','');store.set('sc_code','');ask.notice('Removed from game','The host removed you from this game.').then(()=>location.reload());}
 }
-function toast(t,quiet){const el=$('#toast');el.textContent=t;el.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.display='none',4500);
-  if(!quiet&&(!S||S.phase==='lobby'))alert(t);}
+function toast(t){const el=$('#toast');el.textContent=t;
+  el.style.top=S&&S.phase!=='lobby'?'calc(env(safe-area-inset-top) + 92px)':'calc(env(safe-area-inset-top) + 12px)';
+  el.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>el.style.display='none',4500);}
+// In-app dialogs (bottom sheets) replace the browser's alert/confirm/prompt. Each resolves with the chosen action's value; backdrop tap or Escape = cancel.
+function dlg({title,text,actions,input}){
+  return new Promise(res=>{
+    const old=$('#dlg');if(old){old._done(null)}
+    const el=document.createElement('div');el.id='dlg';
+    const sh=document.createElement('div');sh.className='sh';sh.setAttribute('role','dialog');sh.setAttribute('aria-modal','true');
+    const h2=document.createElement('h2');h2.textContent=title;sh.appendChild(h2);
+    if(text){const p=document.createElement('p');p.textContent=text;sh.appendChild(p)}
+    let inp=null;if(input){inp=document.createElement('input');inp.placeholder=input.ph||'';inp.inputMode=input.mode||'text';inp.maxLength=input.max||40;inp.autocomplete='off';sh.appendChild(inp)}
+    const cancel=actions.find(a=>a.cancel);
+    let done=false;const finish=v=>{if(done)return;done=true;document.removeEventListener('keydown',onKey);el.remove();res(v)};
+    el._done=finish;
+    for(const a of actions){const b=document.createElement('button');b.textContent=a.l;if(a.d)b.className='d';else if(a.g)b.className='g';
+      b.onclick=()=>finish(input&&!a.cancel?inp.value.trim():a.k);sh.appendChild(b)}
+    const onKey=e=>{if(e.key==='Escape')finish(cancel?cancel.k:null);else if(e.key==='Enter'&&input){const ok=actions.find(a=>!a.cancel);if(ok)finish(inp.value.trim())}};
+    document.addEventListener('keydown',onKey);
+    el.onclick=e=>{if(e.target===el)finish(cancel?cancel.k:null)};
+    el.appendChild(sh);document.body.appendChild(el);(inp||sh.querySelector('button:last-child')).focus();
+  });
+}
+const ask={
+  confirm:(title,text,o={})=>dlg({title,text,actions:[{k:true,l:o.ok||'OK',d:o.danger},{k:false,l:o.cancel||'Cancel',g:1,cancel:1}]}),
+  notice:(title,text,ok='OK')=>dlg({title,text,actions:[{k:true,l:ok,cancel:1}]}),
+  choose:(title,text,opts)=>dlg({title,text,actions:[...opts.map(o=>({k:o.k,l:o.l,g:1})),{k:null,l:'Cancel',cancel:1}]}),
+  code:(title,text)=>dlg({title,text,input:{ph:'0000',mode:'numeric',max:4},actions:[{k:'ok',l:'Submit'},{k:null,l:'Cancel',g:1,cancel:1}]})
+};
+const voiceUI=(label,live)=>{$('#bvoice span').textContent=label;$('#bvoice').classList.toggle('live',!!live)};
 function beep(f){try{audioCtx=audioCtx||new AudioContext();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.value=f;o.connect(g);g.connect(audioCtx.destination);g.gain.value=.3;o.start();o.stop(audioCtx.currentTime+.3)}catch(e){}}
 function alertUser(k){beep({ping:740,hunt:1000,warn:300,out:400,over:520}[k]||800);navigator.vibrate&&navigator.vibrate([200,100,200]);document.body.classList.add('flash');setTimeout(()=>document.body.classList.remove('flash'),400);}
 
@@ -250,11 +298,11 @@ function lobby(){
     try{if(navigator.share)await navigator.share({title:'Join my Scurry game',text:'Match code '+S.code,url:u});else{await navigator.clipboard.writeText(u);toast('Link copied',true)}}catch(e){}};
   $('#shr').onclick=share;$('#inv').onclick=share;
   $('#cpy').onclick=async()=>{try{await navigator.clipboard.writeText(S.code);toast('Code copied',true)}catch(e){toast('Code: '+S.code,true)}};
-  if($('#chg'))$('#chg').onclick=()=>{if(confirm('Change the game code? Players already in stay in; the old code stops working.'))send({t:'newcode'})};
+  if($('#chg'))$('#chg').onclick=async()=>{if(await ask.confirm('Change the game code?','Players already in stay in. The old code stops working.',{ok:'Change code'}))send({t:'newcode'})};
   if($('#rdy'))$('#rdy').onclick=()=>send({t:'ready',on:!me_.ready});
   wireThemes();
   document.querySelectorAll('[data-pref]').forEach(b=>b.onclick=()=>send({t:'pref',pref:b.dataset.pref}));
-  document.querySelectorAll('#home [data-kick]').forEach(b=>b.onclick=()=>{if(confirm('Remove this player?'))send({t:'kick',id:b.dataset.kick})});
+  document.querySelectorAll('#home [data-kick]').forEach(b=>b.onclick=async()=>{if(await ask.confirm('Remove this player?','They will not be able to rejoin this game.',{ok:'Remove',danger:true}))send({t:'kick',id:b.dataset.kick})});
   $('#lv').onclick=()=>{store.set('sc_token','');store.set('sc_code','');location.reload()};
   if(H){
     document.querySelectorAll('[data-bump]').forEach(b=>b.onclick=()=>bump(b.dataset.bump,+b.dataset.d));
@@ -263,7 +311,7 @@ function lobby(){
     if($('#tgd'))$('#tgd').onclick=()=>toggleCfg('taggedMode',c.taggedMode==='watch'?'hunter':'watch');
     const push=()=>{const cfg={...S.cfg};document.querySelectorAll('[data-k]').forEach(i=>cfg[i.dataset.k]=+i.value);document.querySelectorAll('[data-b]').forEach(i=>cfg[i.dataset.b]=i.checked);send({t:'config',cfg})};
     document.querySelectorAll('[data-k],[data-b]').forEach(i=>i.onchange=push);
-    $('#go').onclick=()=>{if(notReady>1&&!confirm((notReady-1)+' player(s) are not ready. Start anyway?'))return;push();setTimeout(()=>send({t:'start'}),200)};
+    $('#go').onclick=async()=>{if(notReady>1&&!await ask.confirm('Start the game?',(notReady-1)+' player'+(notReady>2?'s are':' is')+' not ready yet.',{ok:'Start anyway'}))return;push();setTimeout(()=>send({t:'start'}),200)};
     const det=document.querySelector('#home details');
     const initMapOnce=()=>{if(lobbyMap)return;
       const at=S.center||myPos;
@@ -331,27 +379,45 @@ function game(){
     if(y.stale)s='NO GPS SIGNAL ('+y.stale+'s)! '+s;
     $('#hsub').textContent=s;
   }
-  $('#bvoice').style.display=S.cfg.voice?'':'none';$('#bchat').style.display=S.cfg.teamChat?'':'none';
-  $('#bhost').style.display=S.host?'':'none';hostPanel();
-  const bu=$('#buse');bu.style.display=(y.item&&S.phase==='hunt')?'':'none';
+  const mute=y.role==='hunter'&&S.cfg.huntersTalk===false;
+  $('#bvoice').style.display=S.cfg.voice&&!mute?'':'none';$('#bchat').style.display=S.cfg.teamChat&&!mute?'':'none';
+  hostPanel();
+  const bu=$('#buse'),bc=$('#bcaught'),bo=$('#bover');
+  bu.style.display=(y.item&&S.phase==='hunt')?'':'none';
   bu.textContent='Use '+({decoy:'Decoy',ghost:'Ghost',radar:'Radar'}[y.item]||'');
-  $('#bcaught').style.display=(y.role==='runner'&&!y.out&&S.phase!=='over')?'':'none';
-  const act=$('#bact');
-  if(S.phase==='over'){act.textContent=S.host?'Rematch':'Game over';act.className='';act.onclick=()=>S.host&&send({t:'rematch'});}
-  else if(y.role==='runner'&&!y.out){act.textContent='Backup code: '+y.tagCode;act.className='';act.onclick=null;}
-  else if(y.role==='hunter'){act.textContent='Enter runner\'s code';act.className='g';act.onclick=()=>{const c=prompt('Only if a runner you tagged won\'t report it: enter their 4-digit code');if(c)send({t:'tag',code:c})};}
-  else{act.textContent='Out';act.onclick=null;}
+  bc.style.display=(y.role==='runner'&&!y.out&&S.phase!=='over')?'':'none';
+  bo.style.display=S.phase==='over'?'':'none';bo.textContent=S.host?'Rematch':'Game over';bo.className=S.host?'':'g';bo.onclick=()=>S.host&&send({t:'rematch'});
+  $('#prim').style.display=[bu,bc,bo].some(x=>x.style.display!=='none')?'flex':'none';
+  $('#bsos').style.display=S.phase==='over'?'none':'';
+  document.documentElement.style.setProperty('--barh',$('#bar').offsetHeight+'px');   // keep the map credit above the bar
+  moreSheet();
+}
+// "More" sheet: backup tag code, manual code entry, host controls, theme.
+function moreSheet(open){
+  const el=$('#more');if(open)el.style.display='flex';
+  if(el.style.display!=='flex'||!S||!S.you)return;
+  const y=S.you,sig=JSON.stringify([y.role,y.out,y.tagCode,S.host,S.phase,document.documentElement.dataset.theme]);
+  if(!open&&sig===moreSheet.sig)return;moreSheet.sig=sig;
+  let b='';
+  if(y.role==='runner'&&!y.out&&S.phase!=='over')b+=`<div class="card"><label style="margin:0">Backup code</label><div class="big">${esc(y.tagCode||'')}</div><p class="s" style="margin:4px 0 0">Only if a hunter tagged you and the app did not register it: tell them this code. Normally just use the red button.</p></div>`;
+  if(y.role==='hunter'&&S.phase==='hunt')b+='<button class="g" id="mcode">Enter a runner\'s code</button>';
+  if(S.host)b+='<button class="g" id="mhost">Host controls</button>';
+  b+=`<div class="h3">Theme</div>${themePicker()}<button class="g" id="mclose">Close</button>`;
+  $('#mbody').innerHTML=b;wireThemes();
+  $('#mclose').onclick=()=>{el.style.display='none'};
+  if($('#mhost'))$('#mhost').onclick=()=>{el.style.display='none';hostPanel(true)};
+  if($('#mcode'))$('#mcode').onclick=async()=>{const c=await ask.code('Runner\'s code','Only if a runner you tagged will not report it: enter their 4-digit code.');if(c){el.style.display='none';send({t:'tag',code:c})}};
 }
 
 // ---------- chat + voice ----------
 const chatLog=[];
 function addChat(m){chatLog.push(m);const box=$('#msgs');box.insertAdjacentHTML('beforeend',`<div><b>${esc(m.from)}</b> ${esc(m.text)}${m.fid&&m.fid!==(S&&S.you.id)?` <a class="rep" data-rep="${esc(m.fid)}" data-nm="${esc(m.from)}">report</a>`:''}</div>`);box.scrollTop=box.scrollHeight;
-  if($('#chat').style.display!=='flex')$('#bchat').textContent='Chat •';}
+  if($('#chat').style.display!=='flex')$('#bchat').classList.add('dot');}
 $('#buse').onclick=()=>send({t:'use'});
-$('#bsos').onclick=()=>{if(confirm('Send an SOS? The host and players near you will see your location. Only use this if you need help.'))send({t:'sos'})};
-$('#bhost').onclick=()=>hostPanel(true);
+$('#bsos').onclick=async()=>{if(await ask.confirm('Send an SOS?','The host and players near you will see your location. Only use this if you need help.',{ok:'Send SOS',danger:true}))send({t:'sos'})};
+$('#bmore').onclick=()=>moreSheet(true);
 $('#hclose').onclick=()=>{$('#hostp').style.display='none'};
-$('#hend').onclick=()=>{if(confirm('End the game for everyone?'))send({t:'end'})};
+$('#hend').onclick=async()=>{if(await ask.confirm('End the game for everyone?','Everyone is told the host ended it.',{ok:'End game',danger:true}))send({t:'end'})};
 function hostPanel(open){
   const el=$('#hostp');if(open)el.style.display='flex';
   if(el.style.display!=='flex'||!S||!S.roster)return;
@@ -359,18 +425,18 @@ function hostPanel(open){
   $('#hl').innerHTML=S.roster.filter(r=>r.id!==S.you.id).map(r=>`<div class="row"><span>${esc(r.name)}${r.online?'':' (offline)'}${r.stale?' · no GPS '+r.stale+'s':''}${r.flags?' · flagged x'+r.flags:''}${r.reports?' · reported x'+r.reports:''}</span><span><button class="g" data-mute="${r.id}" data-on="${r.muted?0:1}">${r.muted?'Unmute':'Mute'}</button> <button class="d" data-kick="${r.id}">Kick</button></span></div>`).join('')||'<p class="s">No other players.</p>';
   if(S.reports&&S.reports.length)$('#hl').insertAdjacentHTML('afterbegin','<div class="card"><b>Reports</b>'+S.reports.slice(-8).reverse().map(x=>`<div class="row"><span>${esc(x.aboutName)} · ${x.reason}</span><span class="s" style="margin:0">by ${esc(x.byName)}</span></div>`).join('')+'</div>');
   document.querySelectorAll('#hl [data-mute]').forEach(b=>b.onclick=()=>send({t:'mute',id:b.dataset.mute,on:b.dataset.on==='1'}));
-  document.querySelectorAll('#hl [data-kick]').forEach(b=>b.onclick=()=>{if(confirm('Remove this player from the game?'))send({t:'kick',id:b.dataset.kick})});
+  document.querySelectorAll('#hl [data-kick]').forEach(b=>b.onclick=async()=>{if(await ask.confirm('Remove this player?','They will not be able to rejoin this game.',{ok:'Remove',danger:true}))send({t:'kick',id:b.dataset.kick})});
 }
-$('#bcaught').onclick=()=>{if(confirm('Were you tagged? Tap OK to report it. You will be out of the game.'))send({t:'caught'})};
-$('#bchat').onclick=()=>{$('#chat').style.display='flex';$('#bchat').textContent='Chat';$('#msgs').scrollTop=1e9};
-$('#msgs').onclick=e=>{const a=e.target.closest('[data-rep]');if(!a)return;
-  const r=prompt('Report '+a.dataset.nm+'. Type 1 for abuse, 2 for cheating, 3 for unsafe behaviour, 4 for other:');
-  const reason={1:'abuse',2:'cheating',3:'unsafe',4:'other'}[(r||'').trim()];if(reason)send({t:'report',id:a.dataset.rep,reason})};
+$('#bcaught').onclick=async()=>{if(await ask.confirm('Were you tagged?','You will be out of the game.',{ok:"Yes, I'm out",danger:true}))send({t:'caught'})};
+$('#bchat').onclick=()=>{$('#chat').style.display='flex';$('#bchat').classList.remove('dot');$('#msgs').scrollTop=1e9};
+$('#msgs').onclick=async e=>{const a=e.target.closest('[data-rep]');if(!a)return;
+  const reason=await ask.choose('Report '+a.dataset.nm,'What happened? The host will see your report.',[{k:'abuse',l:'Abuse or harassment'},{k:'cheating',l:'Cheating'},{k:'unsafe',l:'Unsafe behaviour'},{k:'other',l:'Something else'}]);
+  if(reason)send({t:'report',id:a.dataset.rep,reason})};
 $('#cclose').onclick=()=>$('#chat').style.display='none';
 const sendChat=()=>{const t=$('#ctext').value.trim();if(t){send({t:'chat',text:t});$('#ctext').value=''}};
 $('#csend').onclick=sendChat;$('#ctext').onkeydown=e=>{if(e.key==='Enter')sendChat()};
 $('#bvoice').onclick=async()=>{
-  if(lkRoom){micOn=!micOn;await lkRoom.localParticipant.setMicrophoneEnabled(micOn);$('#bvoice').textContent=micOn?'Mic ON':'Mic off';return}
+  if(lkRoom){micOn=!micOn;await lkRoom.localParticipant.setMicrophoneEnabled(micOn);voiceUI(micOn?'Mic on':'Mic off',micOn);return}
   send({t:'voice'});
 };
 async function startVoice(v){
@@ -378,7 +444,7 @@ async function startVoice(v){
     if(!window.LivekitClient)await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/livekit-client@2.5.0/dist/livekit-client.umd.min.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)});
     const LK=window.LivekitClient;lkRoom=new LK.Room();
     lkRoom.on(LK.RoomEvent.TrackSubscribed,t=>{if(t.kind==='audio'){const a=t.attach();a.style.display='none';document.body.appendChild(a)}});
-    await lkRoom.connect(v.url,v.token);await lkRoom.localParticipant.setMicrophoneEnabled(true);micOn=true;$('#bvoice').textContent='Mic ON';
+    await lkRoom.connect(v.url,v.token);await lkRoom.localParticipant.setMicrophoneEnabled(true);micOn=true;voiceUI('Mic on',true);
   }catch(e){lkRoom=null;toast('Voice failed: '+(e.message||e))}
 }
 setInterval(()=>{if(S&&S.phase!=='lobby'&&!$('#game').hidden)game()},1000);
@@ -417,9 +483,12 @@ function startPreview(){
   const panel=()=>{$('#pvp').innerHTML=`<b>Preview</b><p class="s" style="margin:2px 0 8px">Sample data only. Nothing is sent to a server.</p>
     <div class="h3" style="margin-top:0">Screen</div><div class="grid">${SCREENS.map(([k,l])=>`<button class="${cur===k?'':'g'}" data-pvs="${k}">${l}</button>`).join('')}</div>
     <div class="h3">Theme</div>${themePicker()}
-    <div class="h3">Try it</div><div class="grid"><button class="g" id="pvt">Show alert</button><button class="g" id="pvh">Hide panel</button></div>`;
+    <div class="h3">Try it</div><div class="grid"><button class="g" id="pvt">Show alert</button><button class="g" id="pvd">Try SOS dialog</button><button class="g" id="pvr">Try report dialog</button><button class="g" id="pvm">Open menu</button><button class="g" id="pvh">Hide panel</button></div>`;
     document.querySelectorAll('[data-pvs]').forEach(b=>b.onclick=()=>show(b.dataset.pvs));wireThemes();
-    $('#pvt').onclick=()=>{toast('PING! Runner positions revealed to hunters.',true);alertUser('ping')};$('#pvh').onclick=()=>{$('#pvp').style.display='none'}};
+    $('#pvt').onclick=()=>{toast('PING! Runner positions revealed to hunters.',true);alertUser('ping')};$('#pvh').onclick=()=>{$('#pvp').style.display='none'};
+    $('#pvd').onclick=()=>{$('#pvp').style.display='none';ask.confirm('Send an SOS?','The host and players near you will see your location. Only use this if you need help.',{ok:'Send SOS',danger:true})};
+    $('#pvr').onclick=()=>{$('#pvp').style.display='none';ask.choose('Report Maya','What happened? The host will see your report.',[{k:'abuse',l:'Abuse or harassment'},{k:'cheating',l:'Cheating'},{k:'unsafe',l:'Unsafe behaviour'},{k:'other',l:'Something else'}])};
+    $('#pvm').onclick=()=>{$('#pvp').style.display='none';moreSheet(true)}};
   const _set=setTheme;setTheme=t=>{_set(t);panel()};
   document.body.insertAdjacentHTML('beforeend','<button id="pv">Preview</button><div id="pvp"></div>');
   $('#pv').onclick=()=>{const p=$('#pvp');p.style.display=p.style.display==='block'?'none':'block'};
