@@ -58,6 +58,13 @@ button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);
 .t.live{background:var(--acc);color:var(--acc-ink)}
 .t.dot::after{content:'';position:absolute;top:7px;right:calc(50% - 22px);width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 2px var(--bar)}
 .t.sos{flex:0 0 68px;background:var(--bad);color:#fff;margin-left:14px!important}
+#zmapbox{height:190px;border-radius:14px;overflow:hidden;box-shadow:0 4px 18px #0006}
+#zmapbox .leaflet-control-attribution{font-size:9px}
+.leaflet-container{background:var(--bg)}
+.lg{display:flex;flex-direction:column}
+.rcol{position:sticky;top:calc(env(safe-area-inset-top) + 4px);z-index:20;background:var(--bg);padding:4px 0 2px;margin-bottom:6px}
+.zcap{margin:6px 2px 4px!important;font-size:12px}
+@media(min-width:900px){#home.lob{max-width:1040px}.lg{display:grid;grid-template-columns:minmax(0,1fr) 460px;gap:22px;align-items:start}.rcol{order:2;top:14px}#zmapbox{height:440px}.lcol{order:1}}
 #map .leaflet-bottom{bottom:var(--barh,100px)}
 #more{position:absolute;left:0;right:0;bottom:0;z-index:700;max-height:75%;background:var(--bg);display:none;flex-direction:column;padding:12px 12px calc(env(safe-area-inset-bottom) + 12px);border-top:2px solid var(--acc);overflow:auto}
 #more b.hd{font-size:18px;margin-bottom:8px}
@@ -193,6 +200,7 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(
 
 // ---------- screens ----------
 function render(){
+  if(lobbyMap&&(!S||S.phase!=='lobby')){lobbyMap.remove();lobbyMap=null;lobby.zm=null}
   if(S&&S.phase==='lobby')sosList.length=0;               // old SOS markers must not carry into a rematch
   if(S&&S.phase==='over')stopGPS();                       // privacy: stop sharing location once the game ends
   else if(S&&(S.phase==='hide'||S.phase==='hunt'))watchGPS(); // also covers a reload mid-game
@@ -201,7 +209,7 @@ function render(){
   $('#home').style.display='none';$('#game').style.display='block';game();
 }
 function home(){
-  if($('#home').dataset.mode==='home')return; $('#home').dataset.mode='home';
+  if($('#home').dataset.mode==='home')return; $('#home').dataset.mode='home';$('#home').classList.remove('lob');
   $('#home').innerHTML=`<h1>Scurry Live</h1><p class="s">Real-life hide-and-seek for up to 70 players. Runners hide, hunters seek, the zone shrinks.</p>
   <div class="card">${store.get('sc_consent')?'':'<label style="color:#fff;font-size:14px"><input type="checkbox" id="cons" style="width:auto"> I agree to share my live location with the other players in my game. It is used only during the game and deleted when it ends.</label>'}<label>Your name</label><input id="nm" maxlength="20" value="${esc(store.get('sc_name')||'')}">
   <button id="mk">Host a new game</button><label>Or join with a code</label><input id="cd" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"><button class="g" id="jn">Join game</button></div>
@@ -246,7 +254,7 @@ function lobby(){
   const sig=JSON.stringify([S.players,S.cfg,S.you.pref,S.host,S.center,S.spots,document.documentElement.dataset.theme]);
   if($('#home').dataset.mode==='lobby'&&(sig===lobby.sig||$('#home').contains(document.activeElement)&&document.activeElement.tagName==='INPUT'))return;
   lobby.sig=sig;$('#home').dataset.mode='lobby';
-  if(lobbyMap){lobbyMap.remove();lobbyMap=null}
+  $('#home').classList.add('lob');
   const c=S.cfg,H=S.host,counts={runner:0,hunter:0,random:0};S.players.forEach(p=>counts[p.pref]++);
   const me_=S.players.find(p=>p.id===S.you.id)||{};
   const n=S.players.length,hn=Math.max(1,Math.min(n-1,Math.round(n*c.hunterRatio)));
@@ -258,6 +266,7 @@ function lobby(){
   $('#home').innerHTML=`<div class="top"><button id="lv">‹ Back</button><b>Lobby</b><button id="shr">Share</button></div>
   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><label style="margin:0">Game code</label><span><button class="lk" id="cpy">Copy</button>${H?'<button class="lk" id="chg">Change</button>':''}</span></div>
    <div style="display:flex;justify-content:space-between;align-items:center"><span class="big">${S.code}</span>${H?'<span class="pill">Hosting</span>':''}</div></div>
+  <div class="lg"><div class="rcol"><div id="zslot"></div><p class="s zcap">${H?'Tap the map to move the zone centre.':'The zone is centred on the host.'} Solid ring: starting size. Dashed ring: final size.</p></div><div class="lcol">
   ${H?`<div class="h3">Game style</div><div class="card"><div class="seg">${Object.entries(PRESETS).map(([k,p])=>`<button class="g ${presetOf(c)===k?'on':''}" data-preset="${k}">${p.label}</button>`).join('')}</div>
    <p class="s" style="margin:8px 0 0">${dur(c.huntSecs)} round · ${dur(c.hideSecs)} head start · ${c.zoneOn?c.radius+' m zone':'no zone'}. Fine-tune below.</p></div>
   <div class="card">
@@ -289,11 +298,11 @@ function lobby(){
    <label><input type="checkbox" data-b="teamChat" ${c.teamChat?'checked':''} style="width:auto"> Team chat</label>
    <label><input type="checkbox" data-b="voice" ${c.voice?'checked':''} style="width:auto"> Team voice</label>
    <label><input type="checkbox" data-b="pingRevealsHunters" ${c.pingRevealsHunters?'checked':''} style="width:auto"> Pings also reveal hunters to runners</label>
-   <p class="s" style="margin:8px 0 4px">Tap the map to set the zone centre (red) or add safe spots (green, ${S.spots.length}/10). Without a pin the zone is around you.</p>
-   <div class="seg"><button class="g on" id="m1">Set zone centre</button><button class="g" id="m2">Add safe spot</button><button class="g" id="m3">Clear spots</button></div>
-   <div id="lmap" style="height:220px;border-radius:10px;margin-top:8px"></div></details></div>`:''}
+   <p class="s" style="margin:8px 0 4px">What does a tap on the map do? Move the zone centre (red) or add a safe spot (green, ${S.spots.length}/10). Without a pin the zone is around you.</p>
+   <div class="seg"><button class="${lobby.mode==='spot'?'g':'g on'}" id="m1">Move zone</button><button class="${lobby.mode==='spot'?'g on':'g'}" id="m2">Add safe spot</button><button class="g" id="m3">Clear spots</button></div></details></div>`:''}
   <button class="g" id="inv">Invite friends</button>
-  ${H?'<button id="go">Start game'+(notReady>1?' ('+(notReady-1)+' not ready)':'')+'</button>':'<p class="s" style="text-align:center">Waiting for the host to start...</p>'}`;
+  ${H?'<button id="go">Start game'+(notReady>1?' ('+(notReady-1)+' not ready)':'')+'</button>':'<p class="s" style="text-align:center">Waiting for the host to start...</p>'}
+  </div></div>`;
   const share=async()=>{const u=location.origin+'/?code='+S.code;
     try{if(navigator.share)await navigator.share({title:'Join my Scurry game',text:'Match code '+S.code,url:u});else{await navigator.clipboard.writeText(u);toast('Link copied',true)}}catch(e){}};
   $('#shr').onclick=share;$('#inv').onclick=share;
@@ -313,21 +322,40 @@ function lobby(){
     document.querySelectorAll('[data-k],[data-b]').forEach(i=>i.onchange=push);
     $('#go').onclick=async()=>{if(notReady>1&&!await ask.confirm('Start the game?',(notReady-1)+' player'+(notReady>2?'s are':' is')+' not ready yet.',{ok:'Start anyway'}))return;push();setTimeout(()=>send({t:'start'}),200)};
     const det=document.querySelector('#home details');
-    const initMapOnce=()=>{if(lobbyMap)return;
-      const at=S.center||myPos;
-      lobbyMap=L_.map('lmap').setView(at?[at.lat,at.lng]:[0,0],at?15:2);
-      setTiles(lobbyMap);
-      let circ=null;const draw=ll=>{if(circ)lobbyMap.removeLayer(circ);circ=L_.circle(ll,{radius:c.radius,color:T('--zone'),fillOpacity:.1}).addTo(lobbyMap)};
-      if(at)draw([at.lat,at.lng]);
-      S.spots.forEach(s=>L_.circle([s.lat,s.lng],{radius:c.safeRadius,color:T('--ok'),fillOpacity:.3}).addTo(lobbyMap));
-      let mode='center';const setM=m=>{mode=m;$('#m1').className='g'+(m==='center'?' on':'');$('#m2').className='g'+(m==='spot'?' on':'')};
-      $('#m1').onclick=()=>setM('center');$('#m2').onclick=()=>setM('spot');$('#m3').onclick=()=>send({t:'spots_clear'});
-      lobbyMap.on('click',e=>{if(mode==='center'){send({t:'center',lat:e.latlng.lat,lng:e.latlng.lng});draw(e.latlng)}else send({t:'spot',lat:e.latlng.lat,lng:e.latlng.lng})});
-      setTimeout(()=>lobbyMap.invalidateSize(),50)};
-    det.addEventListener('toggle',()=>{lobby.open=det.open;if(det.open)initMapOnce()});
-    if(lobby.open)initMapOnce();
+    det.addEventListener('toggle',()=>{lobby.open=det.open});
+    const setM=m=>{lobby.mode=m;$('#m1').className=m==='spot'?'g':'g on';$('#m2').className=m==='spot'?'g on':'g'};
+    $('#m1').onclick=()=>setM('center');$('#m2').onclick=()=>setM('spot');$('#m3').onclick=()=>send({t:'spots_clear'});
   }
+  // The zone-preview map outlives lobby re-renders: its DOM node is re-attached each time, so it never flickers or resets zoom.
+  if(!lobby.zm){lobby.zm=document.createElement('div');lobby.zm.id='zmapbox'}
+  $('#zslot').replaceWith(lobby.zm);
+  if(!lobbyMap){
+    lobbyMap=L_.map(lobby.zm,{zoomControl:false,zoomSnap:.1,zoomDelta:.5}).setView([0,0],2);
+    lobbyMap.attributionControl.setPrefix(false);setTiles(lobbyMap);
+    lobbyMap.on('click',e=>{if(!S||!S.host)return;
+      if(lobby.mode==='spot')send({t:'spot',lat:e.latlng.lat,lng:e.latlng.lng});
+      else{S.center={lat:e.latlng.lat,lng:e.latlng.lng};send({t:'center',lat:e.latlng.lat,lng:e.latlng.lng});zoneMapUpdate()}});
+  }
+  lobbyMap.invalidateSize();zoneMapUpdate();
 }
+// Draws the zone preview: solid ring = starting size, dashed ring = final size, green circles = safe spots. Refits only when the ring leaves the view or gets tiny.
+function zoneMapUpdate(){
+  if(!lobbyMap||!S||S.phase!=='lobby')return;
+  const c=S.cfg,at=S.center||myPos;if(!at)return;
+  const ll=[at.lat,at.lng],fin=Math.round(c.radius*Math.pow(c.stageFactor,c.stages)),zc=T('--zone'),z=lobbyMap._z=lobbyMap._z||{};
+  if(!z.cur){z.cur=L_.circle(ll,{weight:3}).addTo(lobbyMap);z.fin=L_.circle(ll,{weight:2,dashArray:'6 6',fill:false}).addTo(lobbyMap);z.spots=L_.layerGroup().addTo(lobbyMap);
+    z.pin=L_.circleMarker(ll,{radius:5,color:'#fff',weight:2,fillOpacity:1}).addTo(lobbyMap)}
+  z.cur.setLatLng(ll).setRadius(c.radius).setStyle({color:zc,fillColor:zc,fillOpacity:c.zoneOn?.12:.03,opacity:c.zoneOn?1:.3});
+  z.fin.setLatLng(ll).setRadius(fin).setStyle({color:T('--nz'),opacity:c.zoneOn?.9:0});
+  z.pin.setLatLng(ll).setStyle({fillColor:zc});
+  const tip=c.zoneOn?c.radius+' m':'No play zone';
+  if(z.cur.getTooltip())z.cur.setTooltipContent(tip);else z.cur.bindTooltip(tip,{permanent:true,direction:'center',className:'lbl'});
+  z.spots.clearLayers();S.spots.forEach(s=>L_.circle([s.lat,s.lng],{radius:c.safeRadius,color:T('--ok'),weight:2,fillOpacity:.3}).addTo(z.spots));
+  const size=lobbyMap.getSize(),bz=lobbyMap.getBoundsZoom(z.cur.getBounds(),false,L_.point(28,28)),key=ll.join(),zm=lobbyMap.getZoom();
+  if(z.key!==key){lobbyMap.setView(ll,bz,{animate:false});z.key=key}
+  else if(zm>bz+.05||zm<bz-1.5)lobbyMap.setView(ll,bz,{animate:true});
+}
+setInterval(zoneMapUpdate,1500);
 
 // ---------- game ----------
 function initMap(){

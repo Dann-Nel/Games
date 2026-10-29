@@ -60,3 +60,6 @@ tag-code oracle/brute force, burst teleport bypass, malformed-URL crash, name XS
 - No more browser alert/confirm/prompt: `ask.confirm / notice / choose / code` bottom-sheet dialogs (Escape or backdrop = cancel). Toasts now work in the lobby too (they replace the old lobby alert()).
 - Bottom bar: primary row (I've been tagged / Use item / Rematch) above four icon buttons: Chat, Voice, More, SOS (red, set apart, confirm dialog). "More" sheet holds the runner's backup code, hunter's manual code entry, Host controls and the theme picker. Chat shows a dot for unread; Voice turns accent when the mic is live. Hunters see no Chat/Voice when "hunters can talk" is off.
 - Preview (`/?preview`) can open the SOS dialog, report dialog and More sheet.
+
+## Update (live zone map in the lobby)
+- The lobby now has a zone-preview map beside the settings (sticky at the top on phones, right column on wide screens). Solid ring = starting size (updates as Zone size / Style presets change), dashed = final size, green = safe spots, label shows the radius. Host taps the map to move the centre; guests see it read-only. The Leaflet node is kept across lobby re-renders (no flicker); it only refits when the ring leaves the view or gets tiny. "Add safe spot" / "Clear spots" are under More options.
