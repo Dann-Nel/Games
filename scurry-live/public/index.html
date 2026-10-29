@@ -13,13 +13,23 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous">
 <title>Scurry Live</title>
 <style>
-:root{--bg:#000;--card:#1c1c1e;--ink:#fff;--mut:#98989f;--acc:#fca311;--bad:#e5383b;--ok:#2ec4b6;--inp:#2c2c2e;--line:#3a3a3c;--btn2:#2c2c2e}
-body.light{--bg:#f3efe8;--card:#fff;--ink:#1b1d24;--mut:#6a6f7c;--inp:#ece7de;--line:#e1dbd0;--btn2:#e4ded3}
+:root,[data-theme=ember]{--bg:#000;--card:#1c1c1e;--ink:#fff;--mut:#98989f;--acc:#ff4d2e;--acc-ink:#000;--bad:#ff3b30;--ok:#3ddc97;--warn:#ffb020;--expo:#ff7a00;--me:#ff2d2d;--zone:#ff3b30;--nz:#fff;--inp:#2c2c2e;--line:#3a3a3c;--btn2:#2c2c2e;--hud1:#000e;--hud0:#0000;--bar:#000d;--tiles:dark}
+[data-theme=neon]{--bg:#05060a;--card:#14161d;--ink:#f4f6ff;--mut:#8b90a8;--acc:#b6ff3b;--acc-ink:#000;--bad:#ff2bd6;--ok:#b6ff3b;--warn:#3bf0ff;--expo:#ff9f1c;--me:#ff2d2d;--zone:#ff2bd6;--nz:#3bf0ff;--inp:#1e212b;--line:#2b2f3d;--btn2:#1e212b;--hud1:#05060aee;--hud0:#05060a00;--bar:#05060add;--tiles:dark}
+[data-theme=outdoor]{--bg:#fff;--card:#f0f0f3;--ink:#000;--mut:#3c3c43;--acc:#d9480f;--acc-ink:#fff;--bad:#c1121f;--ok:#0a7d5a;--warn:#b35c00;--expo:#e8590c;--me:#e00000;--zone:#c1121f;--nz:#000;--inp:#e2e2e7;--line:#c7c7cc;--btn2:#e2e2e7;--hud1:#fffe;--hud0:#fff0;--bar:#fffd;--tiles:light}
 *{box-sizing:border-box}html,body{height:100%;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 button,.lbl{-webkit-user-select:none;user-select:none;touch-action:manipulation}
 #game{height:100vh;height:100dvh}
 #bg{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 140px);z-index:650;background:var(--bad);color:#fff;font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
 .rep{margin-left:6px;opacity:.6;font-size:12px}
+[data-theme=ember] .leaflet-tile-pane,[data-theme=neon] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.8) contrast(.85) saturate(.5)}
+.leaflet-container{background:var(--bg)}
+.meDot{animation:pls 1.8s ease-in-out infinite}.expo{animation:pls .8s ease-in-out infinite}
+@keyframes pls{50%{opacity:.45}}
+.tp{display:flex;gap:8px}.tp button{margin:0;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:14px}
+.tp i{display:flex;width:100%;height:14px;border-radius:5px;overflow:hidden;outline:1px solid var(--line);outline-offset:-1px}.tp i b{flex:1}
+#pv{position:fixed;right:0;top:40%;z-index:1000;width:auto;margin:0;padding:14px 6px;border-radius:10px 0 0 10px;font-size:12px;writing-mode:vertical-rl;box-shadow:0 2px 10px #0006}
+#pvp{position:fixed;left:0;right:0;bottom:0;z-index:1001;background:var(--bg);color:var(--ink);padding:14px 14px calc(env(safe-area-inset-bottom) + 14px);border-top:2px solid var(--acc);display:none;max-height:75vh;overflow:auto}
+#pvp .grid button{margin:0}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,system-ui,sans-serif;transition:background .2s}
 body.flash{background:var(--bad)}
 .pg{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 16px 40px}
@@ -27,23 +37,24 @@ h1{margin:6px 0}.s{color:var(--mut);margin:0 0 14px}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px}
 label{display:block;margin:8px 0 3px;color:var(--mut);font-size:13px}
 input{width:100%;padding:11px;border-radius:9px;border:0;font-size:16px;background:var(--inp);color:var(--ink)}
-button{width:100%;padding:13px;border:0;border-radius:11px;font-size:16px;font-weight:700;background:var(--acc);color:#000;margin-top:8px}
-button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);color:#fff}button.on{outline:3px solid var(--ok)}
+button{width:100%;padding:13px;border:0;border-radius:11px;font-size:16px;font-weight:700;background:var(--acc);color:var(--acc-ink);margin-top:8px}
+button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);color:#fff}button.g.on,button.on{background:var(--acc);color:var(--acc-ink);outline:0}
 .seg{display:flex;gap:6px}.seg button{margin:0;padding:11px 4px;font-size:15px}
 .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #game{position:fixed;inset:0;display:none}
 #map{position:absolute;inset:0}
-#hud{position:absolute;left:0;right:0;top:0;z-index:500;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:linear-gradient(#000ee,#00000);pointer-events:none}
+#hud{position:absolute;left:0;right:0;top:0;z-index:500;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:linear-gradient(var(--hud1),var(--hud0));pointer-events:none}
+#hud::before{content:'';position:absolute;left:0;right:0;top:0;height:4px;background:var(--rolec,transparent)}
 #hud .a{display:flex;justify-content:space-between;font-weight:800;font-size:15px}
 #hud .b{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
-#hud .c{font-size:13px;color:#ffe9b8}
-#bar{position:absolute;left:0;right:0;bottom:0;z-index:500;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-wrap:wrap;gap:8px;background:#000d9}
+#hud .c{font-size:13px;color:var(--ink);opacity:.85}
+#bar{position:absolute;left:0;right:0;bottom:0;z-index:500;padding:8px 10px calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-wrap:wrap;gap:8px;background:var(--bar)}
 #bar button{margin:0;padding:12px 4px;font-size:15px;flex:1 1 30%}
 #bar #bcaught{flex:1 1 100%;order:-1;padding:16px 4px;font-size:18px}
 #hostp{position:absolute;left:0;right:0;bottom:0;z-index:700;height:70%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #hl{flex:1;overflow:auto}
-#toast{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:600;background:var(--acc);color:#000;font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
+#toast{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 92px);z-index:600;background:var(--acc);color:var(--acc-ink);font-weight:700;padding:10px;border-radius:10px;display:none;text-align:center}
 #chat{position:absolute;left:0;right:0;bottom:0;z-index:700;height:55%;background:var(--bg);display:none;flex-direction:column;padding:10px 10px calc(env(safe-area-inset-bottom) + 10px);border-top:2px solid var(--acc)}
 #msgs{flex:1;overflow:auto;font-size:15px}#msgs b{color:var(--acc)}
 #cin{display:flex;gap:6px}#cin button{width:90px;margin:0}
@@ -51,7 +62,7 @@ button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.top b{font-size:18px}
 .top button{width:auto;margin:0;background:none;color:var(--acc);padding:6px 4px}
 .big{font-size:40px;font-weight:900;letter-spacing:.08em;font-variant-numeric:tabular-nums}
-.pill{display:inline-block;background:var(--bad);color:#fff;font-size:12px;padding:3px 10px;border-radius:99px;font-weight:700}
+.pill{display:inline-block;background:var(--acc);color:var(--acc-ink);font-size:12px;padding:3px 10px;border-radius:99px;font-weight:700}
 .lk{width:auto!important;margin:0!important;background:none!important;color:var(--acc)!important;padding:4px 6px!important}
 .set{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);font-size:16px}
 .set:last-child{border-bottom:0}.set small{display:block;color:var(--mut);font-size:12px}
@@ -61,7 +72,7 @@ button.g{background:var(--btn2);color:var(--ink)}button.d{background:var(--bad);
 .step button:first-child{border-right:1px solid var(--line)}
 .sw{width:50px;height:30px;border-radius:99px;background:var(--btn2);position:relative;padding:0;margin:0}
 .sw::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s}
-.sw.on{background:var(--bad);outline:0}.sw.on::after{left:23px}
+.sw.on{background:var(--acc);outline:0}.sw.on::after{left:23px}
 .h3{margin:16px 4px 6px;color:var(--mut);font-size:13px;text-transform:uppercase;letter-spacing:.05em}
 .rdy{color:var(--acc);font-weight:700}.nrdy{color:var(--mut)}
 details summary{cursor:pointer;color:var(--mut);padding:6px 0}
@@ -146,7 +157,9 @@ function home(){
   $('#home').innerHTML=`<h1>Scurry Live</h1><p class="s">Real-life hide-and-seek for up to 70 players. Runners hide, hunters seek, the zone shrinks.</p>
   <div class="card">${store.get('sc_consent')?'':'<label style="color:#fff;font-size:14px"><input type="checkbox" id="cons" style="width:auto"> I agree to share my live location with the other players in my game. It is used only during the game and deleted when it ends.</label>'}<label>Your name</label><input id="nm" maxlength="20" value="${esc(store.get('sc_name')||'')}">
   <button id="mk">Host a new game</button><label>Or join with a code</label><input id="cd" maxlength="4" placeholder="ABCD" style="text-transform:uppercase"><button class="g" id="jn">Join game</button></div>
-  <p class="s">Needs location access. On iPhone: Share, then Add to Home Screen. Keep Scurry open and the screen on while playing.</p>`;
+  <div class="h3">Theme</div><div class="card">${themePicker()}</div>
+  <p class="s">Needs location access. Android: browser menu, then Install app. iPhone: Share, then Add to Home Screen. Keep Scurry open and the screen on while playing.</p>`;
+  wireThemes();
   const nm=()=>{const n=$('#nm').value.trim();if(!n){toast('Enter a name');return null}
     if(!store.get('sc_consent')){if(!$('#cons').checked){toast('Please agree to share your location to play.');return null}store.set('sc_consent','1')}
     store.set('sc_name',n);return n};
@@ -167,11 +180,22 @@ function bump(key,dir){
 const PRESETS={quick:{label:'Quick',huntSecs:900,hideSecs:60,pingEvery:60,radius:300,hold:120},classic:{label:'Classic',huntSecs:1800,hideSecs:180,pingEvery:120,radius:600,hold:240},big:{label:'Big',huntSecs:3600,hideSecs:300,pingEvery:180,radius:1500,hold:420}};
 const presetOf=c=>Object.keys(PRESETS).find(k=>['huntSecs','hideSecs','pingEvery','radius','hold'].every(f=>PRESETS[k][f]===c[f]));
 function toggleCfg(key,val){send({t:'config',cfg:{...S.cfg,[key]:val}})}
-function setTheme(t){store.set('sc_theme',t);document.body.classList.toggle('light',t==='light')}
-setTheme(store.get('sc_theme')||'dark');
+const THEMES={ember:'Ember',neon:'Neon',outdoor:'Outdoor'};
+const T=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const tileUrl=()=>'https://tile.openstreetmap.org/{z}/{x}/{y}.png';   // dark themes darken these with a CSS filter (no tile API key needed)
+function setTiles(m){if(!m)return;if(m._tl)m.removeLayer(m._tl);m._tl=L_.tileLayer(tileUrl(),{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m)}
+function applyTheme(t){t={dark:'ember',light:'outdoor'}[t]||t;if(!THEMES[t])t='ember';document.documentElement.dataset.theme=t;
+  const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=T('--bg');return t}
+function setTheme(t){t=applyTheme(t);store.set('sc_theme',t);setTiles(map);setTiles(lobbyMap);
+  $('#home').dataset.mode='';lobby.sig=null;render()}
+applyTheme(store.get('sc_theme')||'ember');
+const themePicker=()=>{const cur=document.documentElement.dataset.theme;
+  const sw={ember:['#000','#ff4d2e','#3ddc97'],neon:['#05060a','#b6ff3b','#ff2bd6'],outdoor:['#fff','#d9480f','#0a7d5a']};
+  return `<div class="tp">${Object.keys(THEMES).map(k=>`<button class="g ${cur===k?'on':''}" data-theme-pick="${k}"><i>${sw[k].map(c=>`<b style="background:${c}"></b>`).join('')}</i>${THEMES[k]}</button>`).join('')}</div>`};
+const wireThemes=()=>document.querySelectorAll('[data-theme-pick]').forEach(b=>b.onclick=()=>setTheme(b.dataset.themePick));
 function lobby(){
   watchGPS();
-  const sig=JSON.stringify([S.players,S.cfg,S.you.pref,S.host,S.center,S.spots,store.get('sc_theme')]);
+  const sig=JSON.stringify([S.players,S.cfg,S.you.pref,S.host,S.center,S.spots,document.documentElement.dataset.theme]);
   if($('#home').dataset.mode==='lobby'&&(sig===lobby.sig||$('#home').contains(document.activeElement)&&document.activeElement.tagName==='INPUT'))return;
   lobby.sig=sig;$('#home').dataset.mode='lobby';
   if(lobbyMap){lobbyMap.remove();lobbyMap=null}
@@ -200,7 +224,7 @@ function lobby(){
   <p class="s" style="margin:8px 0 0">${hn} hunter${hn===1?'':'s'} with ${n} player${n===1?'':'s'}. Random fills whichever team needs it.</p></div>
   <div class="h3">Players · ${n}/70</div><div class="card">${S.players.map(p=>`<div class="row"><span>${esc(p.name)}${p.id===S.you.id?' <small class="s">You</small>':''}${p.host?' <small class="s">· Host</small>':''}${p.online?'':' ·offline'}</span><span>${p.pref} · <span class="${p.ready?'rdy':'nrdy'}">${p.ready?'Ready':'Not ready'}</span>${H&&p.id!==S.you.id?` <button class="d" data-kick="${p.id}" style="width:auto;padding:4px 10px;margin:0 0 0 6px">Kick</button>`:''}</span></div>`).join('')||'<p class="s">Nobody here yet. Send your friends the link.</p>'}
    ${H?'':`<button class="${me_.ready?'g':''}" id="rdy">${me_.ready?'Not ready':'I\'m ready'}</button>`}</div>
-  <div class="h3">Appearance</div><div class="card"><div class="seg"><button class="g ${document.body.classList.contains('light')?'on':''}" id="thl">Light</button><button class="g ${document.body.classList.contains('light')?'':'on'}" id="thd">Dark</button></div></div>
+  <div class="h3">Theme</div><div class="card">${themePicker()}</div>
   ${H?`<div class="card"><details ${lobby.open?'open':''}><summary>More options</summary><label><input type="checkbox" data-b="huntersTalk" ${c.huntersTalk?'checked':''} style="width:auto"> Hunters can talk (chat and voice)</label><div class="grid">
    ${field('hold','Zone holds before shrinking (s)',c.hold)}
    ${field('hunterRatio','Hunter share (0.15 = 15%)',c.hunterRatio)}${field('stages','Shrinks (count)',c.stages)}
@@ -228,7 +252,7 @@ function lobby(){
   $('#cpy').onclick=async()=>{try{await navigator.clipboard.writeText(S.code);toast('Code copied',true)}catch(e){toast('Code: '+S.code,true)}};
   if($('#chg'))$('#chg').onclick=()=>{if(confirm('Change the game code? Players already in stay in; the old code stops working.'))send({t:'newcode'})};
   if($('#rdy'))$('#rdy').onclick=()=>send({t:'ready',on:!me_.ready});
-  $('#thl').onclick=()=>{setTheme('light');lobby.sig=null;lobby()};$('#thd').onclick=()=>{setTheme('dark');lobby.sig=null;lobby()};
+  wireThemes();
   document.querySelectorAll('[data-pref]').forEach(b=>b.onclick=()=>send({t:'pref',pref:b.dataset.pref}));
   document.querySelectorAll('#home [data-kick]').forEach(b=>b.onclick=()=>{if(confirm('Remove this player?'))send({t:'kick',id:b.dataset.kick})});
   $('#lv').onclick=()=>{store.set('sc_token','');store.set('sc_code','');location.reload()};
@@ -244,10 +268,10 @@ function lobby(){
     const initMapOnce=()=>{if(lobbyMap)return;
       const at=S.center||myPos;
       lobbyMap=L_.map('lmap').setView(at?[at.lat,at.lng]:[0,0],at?15:2);
-      L_.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(lobbyMap);
-      let circ=null;const draw=ll=>{if(circ)lobbyMap.removeLayer(circ);circ=L_.circle(ll,{radius:c.radius,color:'#e5383b',fillOpacity:.1}).addTo(lobbyMap)};
+      setTiles(lobbyMap);
+      let circ=null;const draw=ll=>{if(circ)lobbyMap.removeLayer(circ);circ=L_.circle(ll,{radius:c.radius,color:T('--zone'),fillOpacity:.1}).addTo(lobbyMap)};
       if(at)draw([at.lat,at.lng]);
-      S.spots.forEach(s=>L_.circle([s.lat,s.lng],{radius:c.safeRadius,color:'#2ec4b6',fillOpacity:.3}).addTo(lobbyMap));
+      S.spots.forEach(s=>L_.circle([s.lat,s.lng],{radius:c.safeRadius,color:T('--ok'),fillOpacity:.3}).addTo(lobbyMap));
       let mode='center';const setM=m=>{mode=m;$('#m1').className='g'+(m==='center'?' on':'');$('#m2').className='g'+(m==='spot'?' on':'')};
       $('#m1').onclick=()=>setM('center');$('#m2').onclick=()=>setM('spot');$('#m3').onclick=()=>send({t:'spots_clear'});
       lobbyMap.on('click',e=>{if(mode==='center'){send({t:'center',lat:e.latlng.lat,lng:e.latlng.lng});draw(e.latlng)}else send({t:'spot',lat:e.latlng.lat,lng:e.latlng.lng})});
@@ -261,11 +285,11 @@ function lobby(){
 function initMap(){
   if(map)return;
   map=L_.map('map',{zoomControl:false}).setView([S.center.lat,S.center.lng],16);
-  L_.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  setTiles(map);
   layers={cur:L_.circle([0,0],{radius:1,color:'#e5383b',weight:3,fillColor:'#e5383b',fillOpacity:.05}).addTo(map),
     next:L_.circle([0,0],{radius:1,color:'#fff',weight:2,dashArray:'8 8',fill:false}).addTo(map),
     meAcc:L_.circle([0,0],{radius:1,color:'#ff2d2d',weight:1,fillOpacity:.12,interactive:false}).addTo(map),
-    me:L_.circleMarker([0,0],{radius:8,color:'#fff',fillColor:'#ff2d2d',fillOpacity:1,weight:3}).addTo(map),
+    me:L_.circleMarker([0,0],{radius:9,color:'#fff',fillColor:'#ff2d2d',fillOpacity:1,weight:4,className:'meDot'}).addTo(map),
     mk:L_.layerGroup().addTo(map),fx:L_.layerGroup().addTo(map)};
   map.invalidateSize();
   layers.cur.setLatLng([S.center.lat,S.center.lng]).setRadius(S.cfg.radius);
@@ -276,23 +300,23 @@ const fmt=ms=>{ms=Math.max(0,Math.ceil(ms/1000));return Math.floor(ms/60)+':'+St
 function game(){
   initMap();keepAwake();
   const z=S.zone,y=S.you,skew=S.now-Date.now(),now=Date.now()+skew;
-  layers.cur.setLatLng([z.cur.lat,z.cur.lng]).setRadius(z.cur.r).setStyle({opacity:S.cfg.zoneOn?1:0,fillOpacity:S.cfg.zoneOn?.05:0});
-  if(z.next&&S.cfg.zoneOn)layers.next.setLatLng([z.next.lat,z.next.lng]).setRadius(z.next.r).setStyle({opacity:1});else layers.next.setStyle({opacity:0});
-  if(myPos){layers.me.setLatLng([myPos.lat,myPos.lng]);layers.meAcc.setLatLng([myPos.lat,myPos.lng]).setRadius(Math.max(myPos.acc||1,1));}
+  const zc=T('--zone');layers.cur.setLatLng([z.cur.lat,z.cur.lng]).setRadius(z.cur.r).setStyle({color:zc,fillColor:zc,opacity:S.cfg.zoneOn?1:0,fillOpacity:S.cfg.zoneOn?.06:0});
+  if(z.next&&S.cfg.zoneOn)layers.next.setLatLng([z.next.lat,z.next.lng]).setRadius(z.next.r).setStyle({opacity:1,color:T('--nz')});else layers.next.setStyle({opacity:0});
+  if(myPos){layers.me.setLatLng([myPos.lat,myPos.lng]).setStyle({fillColor:T('--me')});layers.meAcc.setLatLng([myPos.lat,myPos.lng]).setRadius(Math.max(myPos.acc||1,1)).setStyle({color:T('--me'),fillColor:T('--me')});}
   layers.fx.clearLayers();
-  for(const s of S.spots)L_.circle([s.lat,s.lng],{radius:S.cfg.safeRadius,color:'#2ec4b6',weight:2,dashArray:'4 4',fillOpacity:.25}).bindTooltip('Safe spot',{className:'lbl'}).addTo(layers.fx);
+  for(const s of S.spots)L_.circle([s.lat,s.lng],{radius:S.cfg.safeRadius,color:T('--ok'),weight:2,dashArray:'4 4',fillOpacity:.25}).bindTooltip('Safe spot',{className:'lbl'}).addTo(layers.fx);
   for(const d of S.drops)L_.circleMarker([d.lat,d.lng],{radius:11,color:'#fff',weight:3,fillColor:'#b455ff',fillOpacity:1}).bindTooltip('Supply drop · '+fmt(d.expires-now),{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);
   for(const s of sosList)if(s.lat!=null&&now-s.at<600000)L_.circleMarker([s.lat,s.lng],{radius:14,color:'#fff',weight:3,fillColor:'#ff0000',fillOpacity:.9}).bindTooltip('SOS: '+esc(s.name),{permanent:true,direction:'top',className:'lbl'}).addTo(layers.fx);
   layers.mk.clearLayers();
   for(const m of S.markers){
     const age=Math.round((now-m.t)/1000);
-    const col=m.kind==='watch'?(m.role==='hunter'?'#e5383b':'#2ec4b6'):{ally:'#2ec4b6',ping:'#fca311',exposed:'#e5383b'}[m.kind];
+    const col=m.kind==='watch'?(m.role==='hunter'?T('--bad'):T('--ok')):{ally:T('--ok'),ping:T('--warn'),exposed:T('--expo')}[m.kind];
     if(m.acc>8)L_.circle([m.lat,m.lng],{radius:m.acc,color:col,weight:1,fillOpacity:.08,interactive:false}).addTo(layers.mk);  // accuracy ring
-    const c=L_.circleMarker([m.lat,m.lng],{radius:m.kind==='ally'||m.kind==='watch'?6:9,color:'#fff',weight:2,fillColor:col,fillOpacity:m.kind==='ping'?Math.max(.35,1-age/(S.cfg.pingEvery*2)):1}).addTo(layers.mk);
+    const c=L_.circleMarker([m.lat,m.lng],{radius:m.kind==='ally'||m.kind==='watch'?6:9,color:'#fff',weight:2,fillColor:col,fillOpacity:m.kind==='ping'?Math.max(.35,1-age/(S.cfg.pingEvery*2)):1,className:m.kind==='exposed'?'expo':''}).addTo(layers.mk);
     c.bindTooltip(m.kind==='ally'||m.kind==='watch'?esc(m.name):`${esc(m.name)} · ${m.kind==='ping'?'last ping '+age+'s ago':'EXPOSED live'}${m.acc?' ±'+m.acc+'m':''}`,{permanent:m.kind!=='ally'&&m.kind!=='watch',direction:'top',className:'lbl'});
   }
   const role=y.out?(y.role==='hunter'?'HUNTER (caught)':'SPECTATOR'):y.role.toUpperCase();
-  $('#hrole').textContent=role;$('#hcount').textContent=`${S.counts.runners} runners · ${S.counts.hunters} hunters`;
+  $('#hrole').textContent=role;const rc=y.role==='hunter'?'var(--bad)':y.role==='runner'&&!y.out?'var(--ok)':'var(--mut)';$('#hud').style.setProperty('--rolec',rc);$('#hrole').style.color=rc;$('#hcount').textContent=`${S.counts.runners} runners · ${S.counts.hunters} hunters`;
   if(S.phase==='over'){
     $('#hclock').textContent={hunters:'Hunters win',runners:'Runners win',none:'Game ended by host'}[S.winner]||'Game over';$('#hsub').textContent='';
   }else if(S.phase==='hide'){
@@ -358,5 +382,48 @@ async function startVoice(v){
   }catch(e){lkRoom=null;toast('Voice failed: '+(e.message||e))}
 }
 setInterval(()=>{if(S&&S.phase!=='lobby'&&!$('#game').hidden)game()},1000);
-connect();
+
+// ---------- preview mode: /?preview shows every screen with sample data, no server or GPS needed ----------
+const PREVIEW=/[?&]preview\b/.test(location.search);
+function mockState(kind){
+  const now=Date.now(),c={lat:51.5074,lng:-0.1278},o=(n,e)=>({lat:c.lat+n/111320,lng:c.lng+e/(111320*Math.cos(c.lat*Math.PI/180))});
+  const cfg={hunterRatio:.15,hideSecs:180,radius:600,stages:5,stageFactor:.7,hold:240,shrink:60,pingEvery:120,huntSecs:1800,outsideGrace:30,tagRange:25,taggedMode:'watch',caughtJoinHunters:false,teamChat:true,voice:true,huntersTalk:true,pingRevealsHunters:false,safeSecs:60,safeRadius:20,bounty:false,bountyAt:3,bountyEvery:20,drops:true,dropEvery:120,radarRadius:150,gpsStaleWarn:30,gpsStaleOut:120,maxAccuracy:50,maxSpeed:15,sosRadius:300,watchDelay:60,zoneOn:true};
+  const names=['Maya','Jonas','Priya','Theo','Zane','Lena'];
+  if(kind==='lobby-host'||kind==='lobby-guest'){
+    const host=kind==='lobby-host';
+    return {t:'state',now,code:'PLHN',phase:'lobby',cfg,host,center:null,spots:[],drops:[],
+      you:{id:'me',name:'Rufaro',role:null,out:false,pref:'random',exposed:false,item:null,safe:false,safeLeft:60,stale:0,muted:false},
+      players:[{id:'me',name:'Rufaro',pref:'random',online:true,ready:host,host},{id:'a',name:'Maya',pref:'hunter',online:true,ready:true,host:!host},{id:'b',name:'Jonas',pref:'runner',online:true,ready:true,host:false},{id:'c',name:'Priya',pref:'random',online:true,ready:false,host:false}]};
+  }
+  const role=kind==='hunter'?'hunter':kind==='spectator'?'spectator':'runner';
+  const s={t:'state',now,code:'PLHN',phase:kind==='over'?'over':'hunt',cfg,host:kind==='runner',center:c,winner:kind==='over'?'runners':null,
+    you:{id:'me',name:'Rufaro',role:kind==='over'?'runner':role,out:role==='spectator',pref:'random',exposed:false,tagCode:role==='runner'?'4827':undefined,item:role==='runner'?'decoy':role==='hunter'?'radar':null,safe:false,safeLeft:42,stale:0,muted:false},
+    spots:[{...o(-120,160)},{...o(180,-140)}],drops:[{id:1,...o(90,60),expires:now+110000}],
+    counts:{runners:9,hunters:3,total:12},huntStart:now-420000,huntEnd:now+1380000,nextPingAt:now+47000,
+    zone:{cur:{...c,r:540},next:{...o(40,-30),r:380},shrinking:false,until:now+95000,stage:1},roster:[],markers:[]};
+  if(role==='runner')s.markers=[{id:'a',name:names[0],kind:'ally',...o(60,-80),t:now,acc:6},{id:'b',name:names[1],kind:'ally',...o(-70,-30),t:now,acc:9},{id:'c',name:names[2],kind:'ally',...o(140,110),t:now,acc:7}];
+  if(role==='hunter')s.markers=[{id:'a',name:names[3],kind:'ally',...o(-40,50),t:now,acc:5},{id:'b',name:names[4],kind:'ally',...o(150,-90),t:now,acc:8},
+    {id:'c',name:names[0],kind:'ping',...o(60,-80),t:now-33000,acc:14},{id:'d',name:names[1],kind:'ping',...o(-110,-20),t:now-71000,acc:20},{id:'e',name:names[5],kind:'exposed',...o(300,210),t:now,acc:6}];
+  if(role==='spectator')s.markers=[{id:'a',name:names[3],kind:'watch',role:'hunter',...o(-40,50),t:now-60000,acc:5},{id:'c',name:names[0],kind:'watch',role:'runner',...o(60,-80),t:now-60000,acc:6},{id:'d',name:names[1],kind:'watch',role:'runner',...o(-110,-20),t:now-60000,acc:9}];
+  if(kind==='over')s.markers=[];
+  return s;
+}
+function startPreview(){
+  watchGPS=()=>{};freshFix=()=>{};                          // no GPS prompts in preview
+  myPos={lat:51.5074-20/111320,lng:-0.1278+25/69000,acc:12};
+  const SCREENS=[['home','Home'],['lobby-host','Lobby (host)'],['lobby-guest','Lobby (guest)'],['runner','Runner'],['hunter','Hunter'],['spectator','Tagged: watching'],['over','Game over']];
+  let cur='runner';
+  const show=k=>{cur=k;$('#home').dataset.mode='';lobby.sig=null;S=k==='home'?null:mockState(k);render();panel()};
+  const panel=()=>{$('#pvp').innerHTML=`<b>Preview</b><p class="s" style="margin:2px 0 8px">Sample data only. Nothing is sent to a server.</p>
+    <div class="h3" style="margin-top:0">Screen</div><div class="grid">${SCREENS.map(([k,l])=>`<button class="${cur===k?'':'g'}" data-pvs="${k}">${l}</button>`).join('')}</div>
+    <div class="h3">Theme</div>${themePicker()}
+    <div class="h3">Try it</div><div class="grid"><button class="g" id="pvt">Show alert</button><button class="g" id="pvh">Hide panel</button></div>`;
+    document.querySelectorAll('[data-pvs]').forEach(b=>b.onclick=()=>show(b.dataset.pvs));wireThemes();
+    $('#pvt').onclick=()=>{toast('PING! Runner positions revealed to hunters.',true);alertUser('ping')};$('#pvh').onclick=()=>{$('#pvp').style.display='none'}};
+  const _set=setTheme;setTheme=t=>{_set(t);panel()};
+  document.body.insertAdjacentHTML('beforeend','<button id="pv">Preview</button><div id="pvp"></div>');
+  $('#pv').onclick=()=>{const p=$('#pvp');p.style.display=p.style.display==='block'?'none':'block'};
+  show('runner');$('#pvp').style.display='block';
+}
+if(PREVIEW)startPreview();else connect();
 </script></body></html>

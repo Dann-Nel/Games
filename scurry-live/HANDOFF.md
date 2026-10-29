@@ -50,3 +50,8 @@ tag-code oracle/brute force, burst teleport bypass, malformed-URL crash, name XS
 - Server: cfg.taggedMode ('hunter'|'watch'), watchDelay, zoneOn, huntersTalk; messages `ready`, `newcode`. Spectators only receive delayed positions (per-player history kept 5.5 min, wiped at game end).
 - sim5.js covers these. All of sim, sim2-sim5 pass.
 - Simplified lobby: presets (Quick / Classic / Big) plus five essentials (round length, head start, pings, play zone + size, when tagged). Everything else, including hunters-can-talk, zone hold time, GPS/anti-cheat and bounty/drops, is under "More options" (host only). Guests see a one-line summary of the host's rules.
+
+## Update (themes + preview)
+- Three themes via CSS variables on `<html data-theme>`: Ember (black/grey, red-orange), Neon (black, lime + magenta), Outdoor (white, high contrast, for sunlight). Picker on the home screen and in the lobby; choice saved per phone (old "dark"/"light" values map to ember/outdoor). Map markers, zone and HUD read the theme variables (`T('--ok')` etc). Dark themes darken standard OSM tiles with a CSS filter (CARTO dark tiles now need an API key).
+- Own-location dot is red with a white ring and slow pulse; exposed runners flash orange; selected buttons fill with the accent; HUD has a role-coloured strip (runner green, hunter red).
+- Preview: open `/?preview`. Shows Home, Lobby (host/guest), Runner, Hunter, Tagged-watching and Game over with sample data, a theme switcher and a test alert. No server, GPS or hosting needed.
